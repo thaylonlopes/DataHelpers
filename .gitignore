@@ -361,3 +361,14 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+
+#  ARQUIVOS E PASTAS OCULTAS LOCAIS (ESTRATÉGIA WHITELIST / DENY-BY-DEFAULT)
+.*
+!.gitignore
+!.github/
+!.github/**
+!.template.config/
+!.template.config/**
+!.devcontainer/
+!.devcontainer/**

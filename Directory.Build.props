@@ -1,0 +1,27 @@
+<Project>
+  <PropertyGroup>
+    <!-- Metadados de Autoria e Repositório -->
+    <Authors>Thaylon Mayk, DataHelpers Contributors</Authors>
+    <Company>TL Enterprises</Company>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/thaylonmayk/DataHelpers</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/thaylonmayk/DataHelpers</PackageProjectUrl>
+
+    <!-- Versão SemVer Unificada -->
+    <Version>0.0.1-beta</Version>
+    <AssemblyVersion>0.0.1.0</AssemblyVersion>
+    <FileVersion>0.0.1.0</FileVersion>
+
+    <!-- Governança de Compilação -->
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <!-- Desabilita empacotamento NuGet para Testes e Exemplos -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests')) Or $(MSBuildProjectName.StartsWith('Example.'))">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>
