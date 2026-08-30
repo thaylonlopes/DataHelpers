@@ -2,5 +2,11 @@
 
 namespace MongoDriver.Helpers
 {
-    public class MongoRepositoryBase<T>(IMongoContext context) : RepositoryBase<T>(new MongoCommandRepository<T>(context), new MongoQueryRepository<T>(context)) where T : class;
+    public class MongoRepositoryBase<T> : RepositoryBase<T> where T : class
+    {
+        public MongoRepositoryBase(IMongoContext context)
+            : base(new MongoCommandRepository<T>(context), new MongoQueryRepository<T>(context))
+        {
+        }
+    }
 }

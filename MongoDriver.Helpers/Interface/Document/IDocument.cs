@@ -1,9 +1,9 @@
-﻿using MongoDB.Bson;
-
-namespace MongoDriver.Helpers.Interface.Document
+﻿namespace MongoDriver.Helpers.Interface.Document
 {
-    public interface IDocument
+    public interface IDocument<TKey> : IDocument where TKey : struct
     {
-        ObjectId Id { get; set; }
+        public TKey Id { get; set; }
     }
+
+    public interface IDocument { }
 }

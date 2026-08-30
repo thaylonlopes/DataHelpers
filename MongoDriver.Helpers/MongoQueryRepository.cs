@@ -6,10 +6,14 @@ using System.Linq.Expressions;
 
 namespace MongoDriver.Helpers
 {
-    public class MongoQueryRepository<T>(IMongoContext context) : IQueryRepository<T> where T : class
+    public class MongoQueryRepository<T> : IQueryRepository<T> where T : class
     {
-        private readonly IMongoCollection<T> _collection = context.Database.GetCollection<T>(typeof(T).Name);
+        private readonly IMongoCollection<T> _collection;
 
+        public MongoQueryRepository(IMongoContext context)
+        {
+            if (context == null) throw new ArgumentNullException(nameof(context)); _collection = context.GetCollection<T>(typeof(T).Name);
+        }
         /// <summary>
         /// Obtém a coleção como IQueryable.
         /// </summary>
@@ -21,7 +25,6 @@ namespace MongoDriver.Helpers
         /// <returns>A coleção como IQueryable.</returns>
 
         public IQueryable<T> AsQueryable() => _collection.AsQueryable();
-
 
         /// <summary>
         /// Verifica se há algum documento na coleção.
@@ -81,7 +84,6 @@ namespace MongoDriver.Helpers
         /// <returns>Uma Task que representa a operação assíncrona. O resultado contém o número de documentos que atendam ao filtro.</returns>
 
         public T Get(object key, CancellationToken cancellationToken = default(CancellationToken)) => _collection.Find(Filters.Id<T>(key)).SingleOrDefault(cancellationToken);
-
 
         /// <summary>
         /// Obtém de forma assíncrona um documento pelo seu identificador.
