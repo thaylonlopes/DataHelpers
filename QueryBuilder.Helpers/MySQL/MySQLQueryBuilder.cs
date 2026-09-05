@@ -12,17 +12,15 @@ public class MySQLQueryBuilder : QueryBuilderBase
     /// <summary>
     /// Inicializa uma nova instância de <see cref="MySQLQueryBuilder"/>.
     /// </summary>
-    public MySQLQueryBuilder()
     public MySQLQueryBuilder(int initialCapacity = DefaultInitialCapacity) : base(initialCapacity)
     {
-        QueryBuilderInternal = new StringBuilder();
     }
 
     /// <inheritdoc/>
     public override IQueryBuilder Select(params string[] columns)
     {
         QueryBuilderInternal.Append("SELECT ");
-        QueryBuilderInternal.Append(columns.Length > 0 ? string.Join(", ", columns) : "*");
+        AppendColumns(columns);
         return this;
     }
 
@@ -93,7 +91,11 @@ public class MySQLQueryBuilder : QueryBuilderBase
     /// <inheritdoc/>
     public override IQueryBuilder GroupBy(params string[] columns)
     {
-        QueryBuilderInternal.Append(" GROUP BY ").Append(string.Join(", ", columns));
+        if (columns != null && columns.Length > 0)
+        {
+            QueryBuilderInternal.Append(" GROUP BY ");
+            AppendColumns(columns);
+        }
         return this;
     }
 

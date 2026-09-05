@@ -223,4 +223,19 @@ public class DataImportExportTests
                 File.Delete(tempFile);
         }
     }
+
+    [Fact]
+    public async Task PooledBufferWriter_WriteDelimitedRowAsync_ShouldWriteFormattedLinesCorrectly()
+    {
+        using var stringWriter = new StringWriter();
+        var row1 = new[] { "1", "Produto A", "100.50" };
+        var row2 = new[] { "2", "Produto B", "250.00" };
+
+        await Utils.PooledBufferWriter.WriteDelimitedRowAsync(stringWriter, row1, ';');
+        await Utils.PooledBufferWriter.WriteDelimitedRowAsync(stringWriter, row2, ';');
+
+        var output = stringWriter.ToString();
+        output.Should().Contain("1;Produto A;100.50");
+        output.Should().Contain("2;Produto B;250.00");
+    }
 }

@@ -10,12 +10,10 @@ public abstract class QueryBuilderBase : IQueryBuilder
 {
     protected StringBuilder QueryBuilderInternal;
 
-    public QueryBuilderBase()
     public const int DefaultInitialCapacity = 256;
 
     public QueryBuilderBase(int initialCapacity = DefaultInitialCapacity)
     {
-        QueryBuilderInternal = new StringBuilder();
         QueryBuilderInternal = new StringBuilder(initialCapacity);
     }
 
@@ -37,9 +35,6 @@ public abstract class QueryBuilderBase : IQueryBuilder
 
     public virtual IQueryBuilder WithRowNumber(string partitionBy, string orderBy, string alias = "RowNumber")
     {
-        var partitionClause = string.IsNullOrWhiteSpace(partitionBy) ? "" : $"PARTITION BY {partitionBy} ";
-        var windowFunc = $", ROW_NUMBER() OVER ({partitionClause}ORDER BY {orderBy}) AS {alias}";
-        QueryBuilderInternal.Append(windowFunc);
         QueryBuilderInternal.Append(", ROW_NUMBER() OVER (");
         if (!string.IsNullOrWhiteSpace(partitionBy))
         {
@@ -51,9 +46,6 @@ public abstract class QueryBuilderBase : IQueryBuilder
 
     public virtual IQueryBuilder WithRank(string partitionBy, string orderBy, string alias = "Rank")
     {
-        var partitionClause = string.IsNullOrWhiteSpace(partitionBy) ? "" : $"PARTITION BY {partitionBy} ";
-        var windowFunc = $", RANK() OVER ({partitionClause}ORDER BY {orderBy}) AS {alias}";
-        QueryBuilderInternal.Append(windowFunc);
         QueryBuilderInternal.Append(", RANK() OVER (");
         if (!string.IsNullOrWhiteSpace(partitionBy))
         {
@@ -61,6 +53,24 @@ public abstract class QueryBuilderBase : IQueryBuilder
         }
         QueryBuilderInternal.Append("ORDER BY ").Append(orderBy).Append(") AS ").Append(alias);
         return this;
+    }
+
+    protected void AppendColumns(params string[] columns)
+    {
+        if (columns == null || columns.Length == 0)
+        {
+            QueryBuilderInternal.Append('*');
+            return;
+        }
+
+        for (int i = 0; i < columns.Length; i++)
+        {
+            if (i > 0)
+            {
+                QueryBuilderInternal.Append(", ");
+            }
+            QueryBuilderInternal.Append(columns[i]);
+        }
     }
 
     protected void AppendSpan(ReadOnlySpan<char> span)

@@ -195,4 +195,26 @@ public class QueryBuilderTests
         sql.Should().Contain("ROW_NUMBER() OVER (ORDER BY Id ASC) AS RowNum");
         sql.Should().Contain("RANK() OVER (ORDER BY Id ASC) AS RankNum");
     }
+
+    [Fact]
+    public void QueryBuilders_SelectAndGroupBy_ShouldFormatMultipleColumnsCorrectly()
+    {
+        var builders = new QueryBuilder.Helpers.Core.IQueryBuilder[]
+        {
+            new SQLServerQueryBuilder(),
+            new PostgreSQLQueryBuilder(),
+            new MySQLQueryBuilder(),
+            new OracleQueryBuilder()
+        };
+
+        foreach (var b in builders)
+        {
+            var query = b.Select("Categoria", "Status")
+                         .From("Pedidos")
+                         .GroupBy("Categoria", "Status")
+                         .BuildQuery();
+
+            query.Should().Contain("SELECT Categoria, Status FROM Pedidos GROUP BY Categoria, Status");
+        }
+    }
 }

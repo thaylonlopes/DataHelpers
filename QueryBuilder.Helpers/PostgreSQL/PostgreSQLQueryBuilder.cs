@@ -6,16 +6,14 @@ namespace QueryBuilder.Helpers.PostgreSQL
 {
     public class PostgreSQLQueryBuilder : QueryBuilderBase
     {
-        public PostgreSQLQueryBuilder()
         public PostgreSQLQueryBuilder(int initialCapacity = DefaultInitialCapacity) : base(initialCapacity)
         {
-            QueryBuilderInternal = new StringBuilder();
         }
 
         public override IQueryBuilder Select(params string[] columns)
         {
             QueryBuilderInternal.Append("SELECT ");
-            QueryBuilderInternal.Append(columns.Length > 0 ? string.Join(", ", columns) : "*");
+            AppendColumns(columns);
             return this;
         }
 
@@ -70,13 +68,17 @@ namespace QueryBuilder.Helpers.PostgreSQL
                 JoinType.Full => "FULL JOIN",
                 _ => "INNER JOIN"
             };
-            QueryBuilderInternal.Append($" {joinTypeStr} {table} ON {condition}");
+            QueryBuilderInternal.Append(' ').Append(joinTypeStr).Append(' ').Append(table).Append(" ON ").Append(condition);
             return this;
         }
 
         public override IQueryBuilder GroupBy(params string[] columns)
         {
-            QueryBuilderInternal.Append(" GROUP BY ").Append(string.Join(", ", columns));
+            if (columns != null && columns.Length > 0)
+            {
+                QueryBuilderInternal.Append(" GROUP BY ");
+                AppendColumns(columns);
+            }
             return this;
         }
 
