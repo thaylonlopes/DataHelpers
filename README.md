@@ -176,10 +176,21 @@ Console.WriteLine($"Existem mais registros? {resultadoPaginado.HasMore}");
 
 ## 🏃 Projetos de Demonstração (Showcase)
 
-A solução conta com **8 aplicações executáveis de console** na pasta [`Examples/`](./Examples/README.md), servindo como documentação viva:
+A pasta [`Examples/`](./Examples/README.md) contém exemplos executáveis para referência prática:
+
+### 🌟 Showcase Integrado
+
+Demonstra a integração das bibliotecas em um fluxo de dados corporativo:
+
+```bash
+dotnet run --project Examples/Example.Showcase/Example.Showcase.csproj
+```
+
+### 📂 Exemplos por Biblioteca
 
 | Projeto de Exemplo | Pacote Demonstrado | Guia de Execução |
 | :--- | :--- | :--- |
+| **`Example.Showcase`** | Uso Integrado | `dotnet run --project Examples/Example.Showcase/Example.Showcase.csproj` |
 | **`Example.DataMapping`** | `TL.DataMapping` | `dotnet run --project Examples/Example.DataMapping/Example.DataMapping.csproj` |
 | **`Example.Caching`** | `TL.Caching.Helpers` | `dotnet run --project Examples/Example.Caching/Example.Caching.csproj` |
 | **`Example.AuditLogger`** | `TL.AuditLogger` | `dotnet run --project Examples/Example.AuditLogger/Example.AuditLogger.csproj` |
