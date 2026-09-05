@@ -1,4 +1,4 @@
-﻿using QueryBuilder.Helpers.Core;
+using QueryBuilder.Helpers.Core;
 using QueryBuilder.Helpers.Enums;
 using System.Text;
 
@@ -8,6 +8,7 @@ namespace QueryBuilder.Helpers.Oracle
     {
 
         public OracleQueryBuilder()
+        public OracleQueryBuilder(int initialCapacity = DefaultInitialCapacity) : base(initialCapacity)
         {
             QueryBuilderInternal = new StringBuilder();
         }

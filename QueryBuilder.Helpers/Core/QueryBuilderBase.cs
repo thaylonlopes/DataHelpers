@@ -11,8 +11,12 @@ public abstract class QueryBuilderBase : IQueryBuilder
     protected StringBuilder QueryBuilderInternal;
 
     public QueryBuilderBase()
+    public const int DefaultInitialCapacity = 256;
+
+    public QueryBuilderBase(int initialCapacity = DefaultInitialCapacity)
     {
         QueryBuilderInternal = new StringBuilder();
+        QueryBuilderInternal = new StringBuilder(initialCapacity);
     }
 
     public abstract IQueryBuilder Select(params string[] columns);
@@ -36,6 +40,12 @@ public abstract class QueryBuilderBase : IQueryBuilder
         var partitionClause = string.IsNullOrWhiteSpace(partitionBy) ? "" : $"PARTITION BY {partitionBy} ";
         var windowFunc = $", ROW_NUMBER() OVER ({partitionClause}ORDER BY {orderBy}) AS {alias}";
         QueryBuilderInternal.Append(windowFunc);
+        QueryBuilderInternal.Append(", ROW_NUMBER() OVER (");
+        if (!string.IsNullOrWhiteSpace(partitionBy))
+        {
+            QueryBuilderInternal.Append("PARTITION BY ").Append(partitionBy).Append(' ');
+        }
+        QueryBuilderInternal.Append("ORDER BY ").Append(orderBy).Append(") AS ").Append(alias);
         return this;
     }
 
@@ -44,7 +54,18 @@ public abstract class QueryBuilderBase : IQueryBuilder
         var partitionClause = string.IsNullOrWhiteSpace(partitionBy) ? "" : $"PARTITION BY {partitionBy} ";
         var windowFunc = $", RANK() OVER ({partitionClause}ORDER BY {orderBy}) AS {alias}";
         QueryBuilderInternal.Append(windowFunc);
+        QueryBuilderInternal.Append(", RANK() OVER (");
+        if (!string.IsNullOrWhiteSpace(partitionBy))
+        {
+            QueryBuilderInternal.Append("PARTITION BY ").Append(partitionBy).Append(' ');
+        }
+        QueryBuilderInternal.Append("ORDER BY ").Append(orderBy).Append(") AS ").Append(alias);
         return this;
+    }
+
+    protected void AppendSpan(ReadOnlySpan<char> span)
+    {
+        QueryBuilderInternal.Append(span);
     }
 
     public abstract string BuildQuery();

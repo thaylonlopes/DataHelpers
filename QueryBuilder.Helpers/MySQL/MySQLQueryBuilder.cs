@@ -13,6 +13,7 @@ public class MySQLQueryBuilder : QueryBuilderBase
     /// Inicializa uma nova instância de <see cref="MySQLQueryBuilder"/>.
     /// </summary>
     public MySQLQueryBuilder()
+    public MySQLQueryBuilder(int initialCapacity = DefaultInitialCapacity) : base(initialCapacity)
     {
         QueryBuilderInternal = new StringBuilder();
     }

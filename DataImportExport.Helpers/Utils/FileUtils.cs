@@ -14,6 +14,16 @@ namespace DataImportExport.Helpers.Utils
             return lines;
         }
 
+        public static async IAsyncEnumerable<string> StreamLinesAsync(string filePath)
+        {
+            using var reader = new StreamReader(filePath);
+            string? line;
+            while ((line = await reader.ReadLineAsync()) is not null)
+            {
+                yield return line;
+            }
+        }
+
         public static async Task WriteLinesAsync(string filePath, IEnumerable<string> lines)
         {
             using var writer = new StreamWriter(filePath);

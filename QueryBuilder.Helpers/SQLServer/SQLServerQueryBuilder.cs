@@ -1,4 +1,4 @@
-﻿using QueryBuilder.Helpers.Core;
+using QueryBuilder.Helpers.Core;
 using QueryBuilder.Helpers.Enums;
 using System.Text;
 
@@ -7,6 +7,7 @@ namespace QueryBuilder.Helpers.SQLServer
     public class SQLServerQueryBuilder : QueryBuilderBase
     {
         public SQLServerQueryBuilder()
+        public SQLServerQueryBuilder(int initialCapacity = DefaultInitialCapacity) : base(initialCapacity)
         {
             QueryBuilderInternal = new StringBuilder();
         }

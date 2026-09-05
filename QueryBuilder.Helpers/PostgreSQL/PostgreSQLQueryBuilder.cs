@@ -1,4 +1,4 @@
-﻿using QueryBuilder.Helpers.Core;
+using QueryBuilder.Helpers.Core;
 using QueryBuilder.Helpers.Enums;
 using System.Text;
 
@@ -7,6 +7,7 @@ namespace QueryBuilder.Helpers.PostgreSQL
     public class PostgreSQLQueryBuilder : QueryBuilderBase
     {
         public PostgreSQLQueryBuilder()
+        public PostgreSQLQueryBuilder(int initialCapacity = DefaultInitialCapacity) : base(initialCapacity)
         {
             QueryBuilderInternal = new StringBuilder();
         }

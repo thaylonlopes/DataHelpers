@@ -157,4 +157,70 @@ public class DataImportExportTests
         map.GetPropertyName("CODIGO_PRODUTO").Should().Be("Id");
         map.GetPropertyName("DESCRICAO").Should().Be("Nome");
     }
+
+    [Fact]
+    public void SpanDelimitedParser_EnumerateFields_ShouldExtractAllTokensWithoutHeapAllocation()
+    {
+        ReadOnlySpan<char> line = "1001,Notebook Pro,4500.50,true,2026-09-05";
+        var fields = new List<string>();
+
+        foreach (var field in Utils.SpanDelimitedParser.EnumerateFields(line, ','))
+        {
+            fields.Add(field.ToString());
+        }
+
+        fields.Should().HaveCount(5);
+        fields[0].Should().Be("1001");
+        fields[1].Should().Be("Notebook Pro");
+        fields[2].Should().Be("4500.50");
+        fields[3].Should().Be("true");
+        fields[4].Should().Be("2026-09-05");
+    }
+
+    [Fact]
+    public void SpanDelimitedParser_TypeParsers_ShouldConvertPrimitivesCorrectly()
+    {
+        Utils.SpanDelimitedParser.TryParseInt(" 12345 ".AsSpan(), out var intVal).Should().BeTrue();
+        intVal.Should().Be(12345);
+
+        Utils.SpanDelimitedParser.TryParseDecimal(" 199.99 ".AsSpan(), out var decVal).Should().BeTrue();
+        decVal.Should().Be(199.99m);
+
+        Utils.SpanDelimitedParser.TryParseDouble(" 3.1415 ".AsSpan(), out var dblVal).Should().BeTrue();
+        dblVal.Should().BeApproximately(3.1415, 0.0001);
+
+        Utils.SpanDelimitedParser.TryParseBool(" true ".AsSpan(), out var boolVal).Should().BeTrue();
+        boolVal.Should().BeTrue();
+
+        Utils.SpanDelimitedParser.TryParseBool(" 1 ".AsSpan(), out var boolValNumeric).Should().BeTrue();
+        boolValNumeric.Should().BeTrue();
+
+        Utils.SpanDelimitedParser.TryParseGuid("d3b07384-d113-46d8-9999-73de8fed0001".AsSpan(), out var guidVal).Should().BeTrue();
+        guidVal.Should().Be(Guid.Parse("d3b07384-d113-46d8-9999-73de8fed0001"));
+    }
+
+    [Fact]
+    public async Task FileUtils_StreamLinesAsync_ShouldYieldLinesCorrectly()
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.txt");
+        var expectedLines = new List<string> { "Linha 1", "Linha 2", "Linha 3" };
+
+        try
+        {
+            await Utils.FileUtils.WriteLinesAsync(tempFile, expectedLines);
+
+            var readLines = new List<string>();
+            await foreach (var line in Utils.FileUtils.StreamLinesAsync(tempFile))
+            {
+                readLines.Add(line);
+            }
+
+            readLines.Should().BeEquivalentTo(expectedLines);
+        }
+        finally
+        {
+            if (File.Exists(tempFile))
+                File.Delete(tempFile);
+        }
+    }
 }

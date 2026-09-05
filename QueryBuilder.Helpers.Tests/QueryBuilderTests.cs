@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using FluentAssertions;
 using QueryBuilder.Helpers.DynamoDB;
 using QueryBuilder.Helpers.Enums;
@@ -160,5 +160,39 @@ public class QueryBuilderTests
         query.Should().Contain("KeyConditionExpression: \"PK = 'CLIENTE#100'\"");
         query.Should().Contain("IndexName: \"GSI_Email\"");
         query.Should().Contain("Limit: 25");
+    }
+
+    [Fact]
+    public void QueryBuilders_WithPreAllocatedCapacity_ShouldGenerateCorrectQueries()
+    {
+        var sqlServer = new SQLServerQueryBuilder(512);
+        var postgreSql = new PostgreSQLQueryBuilder(512);
+        var mySql = new MySQLQueryBuilder(512);
+        var oracle = new OracleQueryBuilder(512);
+
+        var sql1 = sqlServer.Select("A", "B").From("Tab").Where("A = 1").BuildQuery();
+        var sql2 = postgreSql.Select("A", "B").From("Tab").Where("A = 1").BuildQuery();
+        var sql3 = mySql.Select("A", "B").From("Tab").Where("A = 1").BuildQuery();
+        var sql4 = oracle.Select("A", "B").From("Tab").Where("A = 1").BuildQuery();
+
+        sql1.Should().Be("SELECT A, B FROM Tab WHERE A = 1");
+        sql2.Should().Be("SELECT A, B FROM Tab WHERE A = 1");
+        sql3.Should().Be("SELECT A, B FROM Tab WHERE A = 1");
+        sql4.Should().Be("SELECT A, B FROM Tab WHERE A = 1");
+    }
+
+    [Fact]
+    public void QueryBuilder_WindowFunctions_ShouldFormatWithoutPartition()
+    {
+        var builder = new PostgreSQLQueryBuilder();
+        var sql = builder
+            .Select("Id")
+            .WithRowNumber(partitionBy: "", orderBy: "Id ASC", alias: "RowNum")
+            .WithRank(partitionBy: " ", orderBy: "Id ASC", alias: "RankNum")
+            .From("Tab")
+            .BuildQuery();
+
+        sql.Should().Contain("ROW_NUMBER() OVER (ORDER BY Id ASC) AS RowNum");
+        sql.Should().Contain("RANK() OVER (ORDER BY Id ASC) AS RankNum");
     }
 }
