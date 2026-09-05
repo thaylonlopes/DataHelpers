@@ -1,4 +1,4 @@
-﻿namespace DataImportExport.Helpers.Utils
+namespace DataImportExport.Helpers.Utils
 {
     public static class FileUtils
     {
@@ -6,13 +6,9 @@
         {
             var lines = new List<string>();
             using var reader = new StreamReader(filePath);
-            while (!reader.EndOfStream)
+            string? line;
+            while ((line = await reader.ReadLineAsync()) is not null)
             {
-                var line = await reader.ReadLineAsync();
-                if (line is null)
-                {
-                    break;
-                }
                 lines.Add(line);
             }
             return lines;

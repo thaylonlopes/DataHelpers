@@ -2,18 +2,9 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>TL.PagingFiltering.Helpers</PackageId>
-    <Version>0.0.1-beta</Version>
-    <Authors>Thaylon Lopes</Authors>
-    <Description>Biblioteca para paginação avançada (Offset e Cursor) e composição booleana de filtros via Specification Pattern.</Description>
     <Title>PagingFiltering.Helpers</Title>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>Biblioteca para paginação avançada (Offset e Cursor) e composição booleana de filtros via Specification Pattern.</Description>
     <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
@@ -22,9 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
   </ItemGroup>
 
 </Project>
