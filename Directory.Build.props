@@ -12,7 +12,7 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
-    <NoWarn>$(NoWarn);1591</NoWarn>
+    <NoWarn>$(NoWarn);1591;NETSDK1206</NoWarn>
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
     <PackageIcon>icon.png</PackageIcon>
     <PackageTags>csharp;dotnet;data-helpers;dapper;mongodb;redis;caching;query-builder;paging</PackageTags>
@@ -22,7 +22,7 @@
     <None Include="$(MSBuildThisFileDirectory)assets\icon.png" Pack="true" PackagePath="" />
   </ItemGroup>
 
-  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests')) Or $(MSBuildProjectName.Contains('.Showcase')) Or $(MSBuildProjectName.StartsWith('Example.'))">
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests')) Or $(MSBuildProjectName.Contains('.Showcase')) Or $(MSBuildProjectName.StartsWith('Example.')) Or $(MSBuildProjectName.EndsWith('.Benchmarks'))">
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
