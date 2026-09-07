@@ -14,8 +14,13 @@
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
     <NoWarn>$(NoWarn);1591</NoWarn>
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageTags>csharp;dotnet;data-helpers;dapper;mongodb;redis;caching;query-builder;paging</PackageTags>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <None Include="$(MSBuildThisFileDirectory)assets\icon.png" Pack="true" PackagePath="" />
+  </ItemGroup>
 
   <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests')) Or $(MSBuildProjectName.Contains('.Showcase')) Or $(MSBuildProjectName.StartsWith('Example.'))">
     <IsPackable>false</IsPackable>

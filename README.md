@@ -1,3 +1,5 @@
+![TL DataHelpers](assets/icon.png)
+
 # 🚀 TL.DataHelpers (DataHelpers)
 
 [![.NET](https://img.shields.io/badge/.NET-net8.0%20%7C%20net9.0-blue.svg)](https://dotnet.microsoft.com/)
