@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using DataMapping.Helpers.Interfaces;
 using FluentAssertions;
 using Xunit;
@@ -155,6 +155,101 @@ public class SimpleMapperTests
 
         result.IsFailure.Should().BeTrue();
         result.Error.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public void Map_ShouldRespectBoundedCapacity_AndEvictOldestMappings_WhenCapacityExceeded()
+    {
+        var cache = new BoundedMappingCache(2);
+        var key1 = new TypePair(typeof(SourceModel), typeof(DestinationModel));
+        var key2 = new TypePair(typeof(CustomerSource), typeof(CustomerDestination));
+        var key3 = new TypePair(typeof(OrderItemSource), typeof(OrderItemDestination));
+
+        cache.GetOrAdd(key1, _ => (Func<SourceModel, DestinationModel>)(s => new DestinationModel { Id = s.Id }));
+        cache.GetOrAdd(key2, _ => (Func<CustomerSource, CustomerDestination>)(c => new CustomerDestination { Name = c.Name }));
+
+        cache.Count.Should().Be(2);
+        cache.ContainsKey(key1).Should().BeTrue();
+        cache.ContainsKey(key2).Should().BeTrue();
+
+        cache.GetOrAdd(key3, _ => (Func<OrderItemSource, OrderItemDestination>)(o => new OrderItemDestination { Product = o.Product }));
+
+        cache.Count.Should().Be(2);
+        cache.ContainsKey(key1).Should().BeFalse();
+        cache.ContainsKey(key2).Should().BeTrue();
+        cache.ContainsKey(key3).Should().BeTrue();
+    }
+
+    [Fact]
+    public void BoundedMappingCache_ShouldPromoteItemToMostRecent_WhenAccessed()
+    {
+        var cache = new BoundedMappingCache(2);
+        var key1 = new TypePair(typeof(SourceModel), typeof(DestinationModel));
+        var key2 = new TypePair(typeof(CustomerSource), typeof(CustomerDestination));
+        var key3 = new TypePair(typeof(OrderItemSource), typeof(OrderItemDestination));
+
+        cache.GetOrAdd(key1, _ => (Func<SourceModel, DestinationModel>)(s => new DestinationModel { Id = s.Id }));
+        cache.GetOrAdd(key2, _ => (Func<CustomerSource, CustomerDestination>)(c => new CustomerDestination { Name = c.Name }));
+
+        cache.GetOrAdd(key1, _ => (Func<SourceModel, DestinationModel>)(s => new DestinationModel { Id = s.Id }));
+
+        cache.GetOrAdd(key3, _ => (Func<OrderItemSource, OrderItemDestination>)(o => new OrderItemDestination { Product = o.Product }));
+
+        cache.Count.Should().Be(2);
+        cache.ContainsKey(key1).Should().BeTrue();
+        cache.ContainsKey(key2).Should().BeFalse();
+        cache.ContainsKey(key3).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(-100)]
+    public void BoundedMappingCache_ShouldThrowArgumentOutOfRangeException_WhenCapacityIsInvalid(int invalidCapacity)
+    {
+        var act = () => new BoundedMappingCache(invalidCapacity);
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName("capacity");
+    }
+
+    [Fact]
+    public void BoundedMappingCache_ShouldHandle50ConcurrentThreadsSafely_WithoutDataCorruption()
+    {
+        var cache = new BoundedMappingCache(50);
+        var threadCount = 50;
+
+        Parallel.For(0, threadCount, i =>
+        {
+            var key = new TypePair(typeof(SourceModel), typeof(DestinationModel));
+            var del = cache.GetOrAdd(key, _ => (Func<SourceModel, DestinationModel>)(s => new DestinationModel { Id = s.Id }));
+            del.Should().NotBeNull();
+        });
+
+        cache.Count.Should().Be(1);
+        cache.ContainsKey(new TypePair(typeof(SourceModel), typeof(DestinationModel))).Should().BeTrue();
+    }
+
+    [Fact]
+    public void SimpleMapper_ConfigureCacheCapacity_ShouldEnforceBoundedLimit()
+    {
+        SimpleMapper.ConfigureCacheCapacity(2);
+        SimpleMapper.ClearCache();
+
+        SimpleMapper.CacheCapacity.Should().Be(2);
+        SimpleMapper.CacheCount.Should().Be(0);
+
+        _mapper.Map<SourceModel, DestinationModel>(new SourceModel { Id = 1 });
+        _mapper.Map<CustomerSource, CustomerDestination>(new CustomerSource { Name = "Test" });
+
+        SimpleMapper.CacheCount.Should().Be(2);
+
+        _mapper.Map<OrderItemSource, OrderItemDestination>(new OrderItemSource { Product = "Book" });
+
+        SimpleMapper.CacheCount.Should().Be(2);
+
+        SimpleMapper.ConfigureCacheCapacity(BoundedMappingCache.DefaultCapacity);
+        SimpleMapper.ClearCache();
     }
 
     private class SourceModel

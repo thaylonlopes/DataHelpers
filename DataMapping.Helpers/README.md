@@ -25,7 +25,7 @@ dotnet add package TL.DataMapping
 
 | Categoria | Componentes & Métodos | Descrição |
 | :--- | :--- | :--- |
-| **Mapeamento Compilado** | `SimpleMapper`, `Map<TSource, TDestination>()` | Compilação dinâmica de delegates lambda de atribuição com cache thread-safe em `ConcurrentDictionary`. |
+| **Mapeamento Compilado** | `SimpleMapper`, `Map<TSource, TDestination>()` | Compilação dinâmica de delegates lambda com **Bounded LRU Cache** thread-safe (limite padrão de 2.048 entradas para proteção de memória). |
 | **Result Pattern Funcional** | `TryMap<TSource, TDestination>()` | Mapeamento monádico que retorna `Result<TDestination>`, eliminando o lançamento de exceções para fluxos de validação. |
 | **Coleções Aninhadas** | `MapCollection<TSource, TDestination>()` | Suporte transparente a listas, enumeráveis e grafos de objetos aninhados. |
 | **Conversores Customizados** | `ITypeConverter<TSource, TDestination>` | Extensibilidade para definir transformações customizadas entre tipos incompatíveis. |

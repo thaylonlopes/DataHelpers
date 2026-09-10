@@ -7,12 +7,189 @@ using DataMapping.Helpers.Interfaces;
 namespace DataMapping.Helpers;
 
 /// <summary>
-/// Mapeador de objetos ultrarrápido baseado em árvores de expressões compiladas com cache thread-safe em memória e suporte a tipos aninhados, coleções e conversores customizados.
+/// Representa um par ordenado de tipos imutável utilizado como chave para indexação e busca de delegates de mapeamento em cache.
+/// </summary>
+public readonly record struct TypePair(Type SourceType, Type DestinationType);
+
+/// <summary>
+/// Cache delimitado thread-safe com política de evicção LRU (Least Recently Used) para armazenamento de delegates compilados.
+/// Previne esgotamento de memória e sobrecarga do heap sob criação dinâmica de tipos.
+/// </summary>
+public class BoundedMappingCache
+{
+    private sealed class CacheNode
+    {
+        public TypePair Key { get; }
+        public Delegate Value { get; set; }
+
+        public CacheNode(TypePair key, Delegate value)
+        {
+            Key = key;
+            Value = value;
+        }
+    }
+
+    /// <summary>
+    /// Capacidade máxima padrão do cache delimitado (2048 pares de tipos mapeados).
+    /// </summary>
+    public const int DefaultCapacity = 2048;
+
+    private readonly object _syncRoot = new();
+    private readonly int _capacity;
+    private readonly Dictionary<TypePair, LinkedListNode<CacheNode>> _map;
+    private readonly LinkedList<CacheNode> _lruOrder;
+
+    /// <summary>
+    /// Obtém a capacidade máxima configurada para este cache.
+    /// </summary>
+    public int Capacity => _capacity;
+
+    /// <summary>
+    /// Obtém o número atual de entradas ativas armazenadas no cache.
+    /// </summary>
+    public int Count
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _map.Count;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Inicializa uma nova instância de <see cref="BoundedMappingCache"/> com a capacidade especificada.
+    /// </summary>
+    /// <param name="capacity">Limite máximo de entradas antes de acionar a evicção LRU.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Lançada quando a capacidade for menor ou igual a zero.</exception>
+    public BoundedMappingCache(int capacity = DefaultCapacity)
+    {
+        if (capacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(capacity), "A capacidade do cache deve ser maior que zero.");
+        }
+
+        _capacity = capacity;
+        _map = new Dictionary<TypePair, LinkedListNode<CacheNode>>(capacity);
+        _lruOrder = new LinkedList<CacheNode>();
+    }
+
+    /// <summary>
+    /// Obtém o delegate compilado correspondente ao par de tipos ou compila e adiciona atomicamente de forma thread-safe.
+    /// </summary>
+    /// <param name="key">Par de tipos fonte e destino.</param>
+    /// <param name="valueFactory">Fábrica de compilação do delegate caso não resida no cache.</param>
+    /// <returns>O delegate compilado.</returns>
+    public Delegate GetOrAdd(TypePair key, Func<TypePair, Delegate> valueFactory)
+    {
+        ArgumentNullException.ThrowIfNull(valueFactory);
+
+        lock (_syncRoot)
+        {
+            if (_map.TryGetValue(key, out var existingNode))
+            {
+                PromoteToMostRecent(existingNode);
+                return existingNode.Value.Value;
+            }
+
+            var compiledDelegate = valueFactory(key);
+            AddInternal(key, compiledDelegate);
+            return compiledDelegate;
+        }
+    }
+
+    /// <summary>
+    /// Limpa todas as entradas armazenadas no cache.
+    /// </summary>
+    public void Clear()
+    {
+        lock (_syncRoot)
+        {
+            _map.Clear();
+            _lruOrder.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Verifica se uma determinada chave de tipos está presente no cache.
+    /// </summary>
+    /// <param name="key">Par de tipos a pesquisar.</param>
+    /// <returns>Verdadeiro se presente no cache, falso caso contrário.</returns>
+    public bool ContainsKey(TypePair key)
+    {
+        lock (_syncRoot)
+        {
+            return _map.ContainsKey(key);
+        }
+    }
+
+    private void AddInternal(TypePair key, Delegate value)
+    {
+        if (_map.Count >= _capacity)
+        {
+            EvictLeastRecentlyUsed();
+        }
+
+        var node = new LinkedListNode<CacheNode>(new CacheNode(key, value));
+        _lruOrder.AddFirst(node);
+        _map[key] = node;
+    }
+
+    private void PromoteToMostRecent(LinkedListNode<CacheNode> node)
+    {
+        if (node != _lruOrder.First)
+        {
+            _lruOrder.Remove(node);
+            _lruOrder.AddFirst(node);
+        }
+    }
+
+    private void EvictLeastRecentlyUsed()
+    {
+        var oldestNode = _lruOrder.Last;
+        if (oldestNode != null)
+        {
+            _lruOrder.RemoveLast();
+            _map.Remove(oldestNode.Value.Key);
+        }
+    }
+}
+
+/// <summary>
+/// Mapeador de objetos ultrarrápido baseado em árvores de expressões compiladas com cache thread-safe delimitado LRU em memória e suporte a tipos aninhados, coleções e conversores customizados.
 /// </summary>
 public class SimpleMapper : IMapper
 {
-    private static readonly ConcurrentDictionary<(Type SourceType, Type DestinationType), Delegate> _mapCache = new();
-    private static readonly ConcurrentDictionary<(Type SourceType, Type DestinationType), Delegate> _customConverters = new();
+    private static BoundedMappingCache _mapCache = new(BoundedMappingCache.DefaultCapacity);
+    private static readonly ConcurrentDictionary<TypePair, Delegate> _customConverters = new();
+
+    /// <summary>
+    /// Obtém a capacidade máxima configurada do cache de delegates de mapeamento.
+    /// </summary>
+    public static int CacheCapacity => _mapCache.Capacity;
+
+    /// <summary>
+    /// Obtém a quantidade atual de pares de tipos compilados em cache.
+    /// </summary>
+    public static int CacheCount => _mapCache.Count;
+
+    /// <summary>
+    /// Reconfigura a capacidade máxima do cache delimitado LRU de delegates de mapeamento.
+    /// </summary>
+    /// <param name="capacity">Nova capacidade máxima estrita.</param>
+    public static void ConfigureCacheCapacity(int capacity)
+    {
+        _mapCache = new BoundedMappingCache(capacity);
+    }
+
+    /// <summary>
+    /// Limpa todas as entradas de delegates do cache de mapeamentos.
+    /// </summary>
+    public static void ClearCache()
+    {
+        _mapCache.Clear();
+    }
 
     /// <summary>
     /// Registra uma função conversora customizada de tipo.
@@ -23,7 +200,7 @@ public class SimpleMapper : IMapper
     public static void RegisterConverter<TSource, TDestination>(Func<TSource, TDestination> converter)
     {
         ArgumentNullException.ThrowIfNull(converter);
-        _customConverters[(typeof(TSource), typeof(TDestination))] = converter;
+        _customConverters[new TypePair(typeof(TSource), typeof(TDestination))] = converter;
         _mapCache.Clear();
     }
 
@@ -51,7 +228,7 @@ public class SimpleMapper : IMapper
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        var key = (typeof(TSource), typeof(TDestination));
+        var key = new TypePair(typeof(TSource), typeof(TDestination));
         var mapDelegate = (Func<TSource, TDestination>)_mapCache.GetOrAdd(key, _ => CreateMapDelegate<TSource, TDestination>());
 
         return mapDelegate(source);
@@ -112,7 +289,7 @@ public class SimpleMapper : IMapper
         var sourceType = typeof(TSource);
         var destType = typeof(TDestination);
 
-        if (_customConverters.TryGetValue((sourceType, destType), out var customConverter))
+        if (_customConverters.TryGetValue(new TypePair(sourceType, destType), out var customConverter))
         {
             return (Func<TSource, TDestination>)customConverter;
         }
@@ -141,7 +318,7 @@ public class SimpleMapper : IMapper
                 continue;
             }
 
-            if (_customConverters.TryGetValue((sourcePropType, destPropType), out var propertyConverter))
+            if (_customConverters.TryGetValue(new TypePair(sourcePropType, destPropType), out var propertyConverter))
             {
                 var propAccess = Expression.Property(parameter, sourceProp);
                 var converterConst = Expression.Constant(propertyConverter);

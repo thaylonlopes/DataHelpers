@@ -12,9 +12,10 @@ O pacote `TL.DataMapping` foi projetado para fornecer um meio-termo de alto dese
 
 ## Decisões Arquiteturais
 
-### 1. Compilação Dinâmica via Expression Trees com Cache Thread-Safe
+### 1. Compilação Dinâmica via Expression Trees com Cache Delimitado LRU (Bounded Cache)
 - O `SimpleMapper` inspeciona as propriedades públicas na primeira execução e compila delegates tipados `Func<TSource, TDestination>` utilizando `System.Linq.Expressions` (`Expression.MemberInit`, `Expression.New`).
-- Os delegates compilados são armazenados em um cache estático thread-safe baseado em `ConcurrentDictionary<(Type, Type), Delegate>`, garantindo que invocações subsequentes atinjam performance equivalente a código estático escrito manualmente.
+- Os delegates compilados são armazenados em um cache delimitado thread-safe (`BoundedMappingCache`) com política de evicção LRU (Least Recently Used) e capacidade padrão de 2.048 pares de tipos (configurável).
+- Essa arquitetura mitiga o risco de esgotamento de memória e ataques de negação de serviço , garantindo tempo de resposta sub-microsegundo para cache hits sem crescimento irrestrito da memória gerenciada.
 
 ### 2. Mapeamento Recursivo e Suporte a Coleções Aninhadas
 - A compilação detecta automaticamente propriedades complexas e coleções (`IEnumerable<T>`, `List<T>`, arrays).
@@ -34,5 +35,6 @@ O pacote `TL.DataMapping` foi projetado para fornecer um meio-termo de alto dese
 
 - **Performance:** Execução ultrarrápida próxima ao código C# manual após a compilação do delegate.
 - **Robustez Funcional:** O Result Pattern permite tratamento limpo de erros sem sobrecarga de exceptions na CLR.
-- **Trade-off de Inicialização:** A primeira invocação para cada par de tipos incorre em um pequeno custo de compilação da árvore de expressões (mitigado pelo cache concorrente permanente).
+- **Blindagem de Memória:** A política LRU estrita garante teto fixo de memória mesmo sob geração dinâmica contínua de tipos.
+- **Trade-off de Inicialização:** A primeira invocação para cada par de tipos incorre em um pequeno custo de compilação da árvore de expressões (amortizado pelo cache LRU).
 
