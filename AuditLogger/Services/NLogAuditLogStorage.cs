@@ -1,20 +1,25 @@
 using AuditLogger.Interfaces;
 using AuditLogger.Models;
-using NLog;
+using Microsoft.Extensions.Logging;
 
 namespace AuditLogger.Services;
 
 /// <summary>
-/// Provedor de armazenamento e despacho de logs de auditoria via NLog.
+/// Provedor de compatibilidade que repassa o registro de auditoria para <see cref="ILogger"/>.
 /// </summary>
-public class NLogAuditLogStorage : IAuditLogStorage
+public class NLogAuditLogStorage : LoggerAuditLogStorage
 {
-    private static readonly Logger _logger = LogManager.GetCurrentClassLogger();
-
-    /// <inheritdoc/>
-    public void SaveLog(AuditLogEntry logEntry)
+    /// <summary>
+    /// Inicializa uma nova instância de <see cref="NLogAuditLogStorage"/>.
+    /// </summary>
+    public NLogAuditLogStorage()
     {
-        ArgumentNullException.ThrowIfNull(logEntry);
-        _logger.Info($"Audit Log: {logEntry.Operation} by {logEntry.UserId} on {logEntry.Entity} at {logEntry.Timestamp} with data {logEntry.Data}");
+    }
+
+    /// <summary>
+    /// Inicializa uma nova instância de <see cref="NLogAuditLogStorage"/> com a abstração <see cref="ILogger"/>.
+    /// </summary>
+    public NLogAuditLogStorage(ILogger logger) : base(logger)
+    {
     }
 }
