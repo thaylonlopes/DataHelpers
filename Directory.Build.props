@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>Thaylon Lopes</Authors>
     <Company>Thaylon Lopes</Company>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -15,6 +15,10 @@
     <NoWarn>$(NoWarn);1591;NETSDK1206</NoWarn>
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
     <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)nupkgs</PackageOutputPath>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <PackageTags>csharp;dotnet;data-helpers;dapper;mongodb;redis;caching;query-builder;paging</PackageTags>
   </PropertyGroup>
 

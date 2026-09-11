@@ -61,7 +61,7 @@ C4Context
     SystemDb(relational_dbs, "Bancos Relacionais", "SQL Server, PostgreSQL, MySQL, SQLite, Oracle.")
     SystemDb(document_dbs, "Bancos de Documentos / NoSQL", "MongoDB, DynamoDB.")
     SystemDb(cache_systems, "Sistemas de Cache", "Redis, Memcached, NCache, Apache Ignite, MemoryCache.")
-    SystemDb(storage_destinations, "Destinos de Armazenamento", "Sistemas de Arquivos, Serilog, NLog.")
+    SystemDb(storage_destinations, "Destinos de Armazenamento", "Sistemas de Arquivos, ILogger, MemoryCache.")
 
     Rel(developer, app, "Implementa lógica de negócio utilizando")
     Rel(app, datahelpers, "Consome componentes utilitários de")
@@ -86,8 +86,8 @@ C4Container
         Container(query_builder, "TL.QueryBuilder.Helpers", "C# / net8.0;net9.0", "Query builders fluentes para SQL Server, PostgreSQL, MySQL, Oracle, MongoDB e DynamoDB.")
         Container(paging_helper, "TL.PagingFiltering.Helpers", "C# / net8.0;net9.0", "Keyset Seek Pagination O(1), Specification pattern composicional e Dynamic Filter Parser.")
         Container(io_helper, "TL.DataImportExport.Helpers", "C# / net8.0;net9.0", "Importação e exportação assíncrona streaming para CSV, Excel, JSON, XML e ColumnMap.")
-        Container(map_helper, "TL.DataMapping", "C# / net8.0;net9.0", "SimpleMapper baseado em árvores de expressões compiladas com Result Pattern.")
-        Container(audit_logger, "TL.AuditLogger", "C# / net8.0;net9.0", "Trilhas de auditoria para operações CRUD com diff JSON automático e storage pluggável.")
+        Container(map_helper, "TL.DataMapping", "C# / net8.0;net9.0", "SimpleMapper com Bounded Cache LRU, Expression Trees e Result Pattern.")
+        Container(audit_logger, "TL.AuditLogger", "C# / net8.0;net9.0", "Trilhas de auditoria com diff JSON, mascaramento de dados sensíveis, ILogger e sanitização CRLF.")
     }
 
     Rel(mongo_helper, mongo_helper, "Publica eventos via IEventCatcher")
@@ -152,15 +152,19 @@ C4Container
   - `ColumnMap<T>`: Mapeador fluente para correspondência de colunas heterogêneas.
 
 ### 3.7. `DataMapping.Helpers` (`TL.DataMapping`)
-- **Papel:** Mapeador de objetos ultrarrápido em memória com Result Pattern.
-- **Funcionamento:** Compila dinamicamente árvores de expressões (`Expression.MemberInit`, `Expression.Lambda`) para realizar binding direto de propriedades públicas sem custo contínuo de reflexão, com cache thread-safe em `ConcurrentDictionary`.
+- **Papel:** Mapeador de objetos ultrarrápido em memória com Result Pattern e blindagem contra exaustão de recursos.
+- **Funcionamento:** Compila dinamicamente árvores de expressões (`Expression.MemberInit`, `Expression.Lambda`) para realizar binding direto de propriedades públicas sem custo contínuo de reflexão. Os delegates compilados são gerenciados por um **Bounded LRU Cache** thread-safe (`BoundedMappingCache`) com capacidade delimitada padrão de 2.048 pares de tipos, prevenindo esgotamento de memória Heap.
 - **Diferenciais:** `TryMap<TSource, TDestination>` retornando `Result<TDestination>`, suporte a coleções aninhadas e conversores customizados (`ITypeConverter<TSource, TDestination>`).
 
 ### 3.8. `AuditLogger` (`TL.AuditLogger`)
-- **Papel:** Rastreamento e persistência de auditoria de operações (`CREATE`, `READ`, `UPDATE`, `DELETE`).
+- **Papel:** Rastreamento e persistência de auditoria de operações (`CREATE`, `READ`, `UPDATE`, `DELETE`) com conformidade regulatória (LGPD/GDPR) e segurança de logs.
 - **Principais Componentes:**
   - `AuditLogger` (`IAuditLogger`): Registra entradas de auditoria (`AuditLogEntry`) capturando usuário, entidade, timestamps e cálculo automático de diferencial JSON por propriedade (`Old`, `New`, `Diff`).
-  - `AuditLogStorageFactory`: Criação sob demanda do armazenamento configurado (`SerilogAuditLogStorage`, `NLogAuditLogStorage`, `MemoryCacheAuditLogStorage`).
+  - **Mascaramento de Dados Sensíveis:** Proteção via atributo `[SensitiveData]` e detecção heurística para campos sensíveis (`Password`, `Token`, `Secret`, `Cpf`, `CreditCard`), impedindo que dados confidenciais sejam gravados em texto plano.
+  - **Higienização contra Log/CRLF Injection:** Neutralização rigorosa de caracteres `\r` e `\n` nos campos textuais e payloads de controle.
+  - **Contexto Distribuído W3C / OpenTelemetry:** Integração nativa de `CorrelationId` (via `Activity.Current`) e `TenantId` através de `AuditCorrelationContext`.
+  - **Desacoplamento de Sinks:** Emissão através de `ILogger<AuditLogger>` (`LoggerAuditLogStorage`), mantendo adaptadores legados para compatibilidade e `MemoryCacheAuditLogStorage`.
+  - `AuditLogStorageFactory`: Criação sob demanda do armazenamento configurado via opções.
 
 ---
 
