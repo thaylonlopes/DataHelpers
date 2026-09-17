@@ -4,10 +4,10 @@
 [![.NET](https://img.shields.io/badge/.NET-net8.0%20%7C%20net9.0-blue.svg)](https://dotnet.microsoft.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE.txt)
 
-> **High-performance multilevel caching library for .NET: L1/L2 hybrid cache, RedLock stampede protection, GZip compression, and tenant partitioning.**  
-> *Biblioteca de caching multinível de alta performance para .NET: cache híbrido L1/L2, proteção contra cache stampede com RedLock, compressão GZip e particionamento por tenant.*
+> **High-performance enterprise caching library for .NET: L1/L2 hybrid cache, zero-cost in-memory fallback, RedLock stampede protection, GZip buffer pooling, and data protection encryption.**  
+> *Biblioteca corporativa de caching de alta performance para .NET: cache híbrido L1/L2, fallback em memória Custo Zero ($0), proteção contra cache stampede com RedLock, compressão GZip com pooling e criptografia para proteção de dados.*
 
-O **`TL.Caching.Helpers`** disponibiliza uma camada de cache corporativa completa, combinando cache em memória ultrarrápido (L1) com cache distribuído resiliente no Redis (L2). Conta com mecanismos avançados de *Distributed Locking* (RedLock) para erradicar o problema de *Cache Stampede*, compressão de tráfego e suporte nativo a isolamento multi-tenant.
+O **`TL.Caching.Helpers`** disponibiliza uma camada de cache corporativa completa e de alta vazão para aplicações modernas em .NET 8 e .NET 9. Combina cache local em memória (L1) com cache distribuído resiliente no Redis (L2), proteção anti-stampede via *Double-Checked Locking* com RedLock, compressão GZip com reciclagem de memória via `ArrayPool<byte>.Shared`, mitigação de concorrência com *TTL Jitter*, e proteção de dados com criptografia em repouso.
 
 ---
 
@@ -21,36 +21,67 @@ dotnet add package TL.Caching.Helpers
 
 ---
 
-## 🚀 Funcionalidades Principais
+## 🚀 Funcionalidades Principais (v0.3.0)
 
-| Categoria | Componentes & Métodos | Descrição |
+| Funcionalidade | Componentes & Classes | Descrição |
 | :--- | :--- | :--- |
-| **Cache Híbrido Multinível** | `IHierarchicalCacheService` | Consulta em memória (L1); em caso de miss, busca no Redis (L2) e repovoa o L1 de forma transparente. |
-| **Proteção Anti-Stampede** | `LockedCacheService` | Implementação de lock distribuído (*Double-Checked Locking*) via RedLock, impedindo que milhares de requisições sobrecarreguem o banco ao expirar uma chave. |
-| **Compressão de Dados** | `CompressionHelper` (GZip) | Compactação automática de payloads volumosos antes da gravação no Redis, economizando tráfego de rede e memória. |
-| **Particionamento por Regiões** | `region`, `tenantId` | Agrupamento lógico de chaves para invalidação em lote e isolamento seguro de múltiplos clientes. |
-| **Controle de Vazão** | `AddThrottledCache()` | Integração fluente com políticas de resiliência e limitação de requisições baseadas em Polly. |
+| **Modo Custo Zero ($0)** | `MemoryCacheService`, `AddTlCaching()` | Execução 100% em memória local com `IMemoryCache` quando `Cache:UseRedis == false` ou ausente, sem custo de infraestrutura de nuvem. |
+| **Compressão GZip com ArrayPool** | `GZipCompressionProvider`, `ICacheCompression` | Compactação automática de payloads maiores que 1 KB com economia de mais de 60% de banda/RAM e bypass inteligente para payloads < 1 KB. |
+| **Resiliência de TTL com Jitter** | `TtlJitterCalculator` | Dispersão pseudo-aleatória de expiração em ±10% a ±15%, impedindo que milhares de chaves expirem no mesmo segundo (*Thundering Herd*). |
+| **Double-Checked Locking & Fallback** | `CacheLockHelper`, `LockedCacheService` | Lock distribuído restrito a cache miss para recálculo da factory. Leituras e escritas convencionais operam livres de lock, com fallback silencioso caso o Redis caia. |
+| **Criptografia e Proteção de Dados** | `AesEncryptionProvider`, `ICacheEncryption` | Proteção de dados confidenciais (PII, tokens) em nível de aplicação com integridade e limpeza de memória (`ZeroMemory`). |
+| **Pipeline Ordenado** | `CachePayloadPipeline` | Integração sequencial estrita: Serialização -> Compressão (GZip) -> Criptografia. |
+| **Particionamento por Regiões** | `region`, `InvalidateRegionAsync` | Invalidação atômica de chaves agrupadas por região ou tenant sem comandos bloqueantes globais. |
 
 ---
 
-## 💡 Exemplos de Uso
+## 💡 Exemplos de Configuração e Uso
 
-### 1. Injeção de Dependência no `Program.cs`
+### 1. Configuração Declarativa no `appsettings.json`
+
+#### Modo Custo Zero ($0) — Execução Local / Testes
+```json
+{
+  "Cache": {
+    "UseRedis": false
+  }
+}
+```
+
+#### Modo Produção Distribuído com Redis
+```json
+{
+  "Cache": {
+    "UseRedis": true,
+    "RedisConnectionString": "redis-cluster.internal:6379,ssl=true,abortConnect=false"
+  }
+}
+```
+
+---
+
+### 2. Injeção de Dependência no `Program.cs`
 
 ```csharp
 using Caching.Helpers.Extensions;
 
-// Registra Redis distribuído
-builder.Services.AddRedisCache(builder.Configuration);
+// Alternância transparente entre Redis e Modo Custo Zero ($0) conforme configuração
+builder.Services.AddTlCaching(builder.Configuration);
 
-// Registra Cache Hierárquico L1 (Memory) + L2 (Redis)
-builder.Services.AddHierarchicalCache(builder.Configuration);
+// Ou registrar explicitamente o Modo Custo Zero em memória:
+// builder.Services.AddMemoryCacheService();
+
+// Ou registrar explicitamente o Redis com connection string direta:
+// builder.Services.AddRedisCache(builder.Configuration);
 ```
 
-### 2. Consulta Segura contra Cache Stampede
+---
+
+### 3. Proteção contra Cache Stampede com Double-Checked Locking e Jitter
 
 ```csharp
-using Caching.Helpers.Services;
+using Caching.Helpers;
+using Caching.Helpers.Resilience;
 
 public class CatalogoService
 {
@@ -61,35 +92,65 @@ public class CatalogoService
         _cacheService = cacheService;
     }
 
-    public async Task<List<ProdutoDto>> ObterProdutosDestaqueAsync()
+    public async Task<List<ProdutoDto>> ObterCatalogoAsync()
     {
+        // Aplica jitter de ±10% a ±15% sobre o tempo base de 30 minutos
+        var ttlComJitter = TtlJitterCalculator.ApplyJitter(TimeSpan.FromMinutes(30));
+
         return await _cacheService.GetOrSetWithLockAsync(
-            key: "produtos:destaque",
-            factory: async () => await CarregarDoBancoDeDadosAsync(),
-            expiration: TimeSpan.FromMinutes(10)
+            key: "catalogo:produtos",
+            factory: async () => await ConsultarBancoDeDadosAsync(),
+            expiration: ttlComJitter
         );
     }
 
-    private static async Task<List<ProdutoDto>> CarregarDoBancoDeDadosAsync()
+    private static async Task<List<ProdutoDto>> ConsultarBancoDeDadosAsync()
     {
-        await Task.Delay(50);
+        await Task.Delay(100);
         return new List<ProdutoDto>
         {
-            new("Notebook Corporativo", 4500.00m),
-            new("Monitor UltraWide", 1800.00m)
+            new(1, "Notebook Corporativo", 5200.00m),
+            new(2, "Monitor UltraWide 34\"", 2400.00m)
         };
     }
 }
 
-public record ProdutoDto(string Nome, decimal Preco);
+public record ProdutoDto(int Id, string Nome, decimal Preco);
+```
+
+---
+
+### 4. Criptografia e Proteção de Dados em Repouso
+
+```csharp
+using System.Security.Cryptography;
+using Caching.Helpers.Compression;
+using Caching.Helpers.Pipeline;
+using Caching.Helpers.Security;
+
+// Chave simétrica de 256 bits (32 bytes) carregada de cofre de chaves seguro (Key Vault / KMS)
+var chaveMestra = Convert.FromBase64String("sua-chave-secreta-em-base64-de-32-bytes=");
+
+var compression = new GZipCompressionProvider();
+using var encryption = new AesEncryptionProvider(chaveMestra);
+
+// Configura o pipeline ordenado: GZip -> Criptografia
+var pipeline = new CachePayloadPipeline(compression, encryption);
+
+// Serializa, comprime se > 1 KB e cifra com integridade de tag
+var payloadCifrado = pipeline.Encode(sessaoUsuario);
+
+// Decifra validando tag (rejeita adulteração), descomprime e deserializa
+var sessaoRestaurada = pipeline.Decode<SessaoUsuarioDto>(payloadCifrado);
 ```
 
 ---
 
 ## 🏛️ Decisões Arquiteturais e Segurança
 
-Para detalhes sobre locking distribuído, arquitetura de camadas e mitigação de latência:
-- 📄 [ADR-002: Decisões Arquiteturais do TL.Caching.Helpers](../docs/adr/ADR-002-pacote-caching-helpers.md)
+Para detalhes sobre governança arquitetural, resiliência, FinOps e modelagem criptográfica:
+- 📄 [ADR-001: Arquitetura do Ecossistema TL.DataHelpers e Segurança](../docs/ADR-001-arquitetura-ecossistema-datahelpers-e-seguranca.md)
+- 📄 [ADR-000: Convenções e Padrões Globais](../docs/adr/ADR-000-arquitetura-e-convencoes.md)
 
 ---
 

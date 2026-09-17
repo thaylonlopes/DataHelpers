@@ -363,9 +363,26 @@ MigrationBackup/
 FodyWeavers.xsd
 
 
-#  ARQUIVOS E PASTAS OCULTAS LOCAIS (ESTRATÉGIA WHITELIST / DENY-BY-DEFAULT)
+
+# Regra Canonica 11: Bloqueio absoluto de binarios empacotados no repositorio
+*.nupkg
+*.snupkg
+*.tgz
+artifacts/
+nupkgs/
+
+# =============================================================================
+# ARQUIVOS E PASTAS OCULTAS LOCAIS (ESTRATEGIA WHITELIST / DENY-BY-DEFAULT)
+# Bloqueia silenciosamente todas as ferramentas locais e arquivos do dev
+# =============================================================================
 .*
+scratchpad.md
+**/scratchpad.md
+
+# Allowlist de Excecoes Publicas do Repositorio:
 !.gitignore
+!.gitattributes
+!.dockerignore
 !.github/
 !.github/**
 !.template.config/

@@ -36,8 +36,7 @@ graph TD
 
 | Pacote NuGet | Descrição Oficial (Resumo) | Runtimes Suportados | Guia do Pacote | Decisão Arquitetural |
 | :--- | :--- | :---: | :---: | :---: |
-| **`TL.DataMapping`** | High-speed object mapper for .NET based on compiled Expression Trees: Result pattern integration, nested collections, and custom type converters. | `net8.0`<br/>`net9.0` | [README](./DataMapping.Helpers/README.md) | [ADR-001](./docs/adr/ADR-001-pacote-datamapping.md) |
-| **`TL.Caching.Helpers`** | High-performance multilevel caching library for .NET: L1/L2 hybrid cache, RedLock stampede protection, GZip compression, and tenant partitioning. | `net8.0`<br/>`net9.0` | [README](./Caching.Helpers/README.md) | [ADR-002](./docs/adr/ADR-002-pacote-caching-helpers.md) |
+| **`TL.Caching.Helpers`** | High-performance enterprise caching library for .NET: L1/L2 hybrid cache, zero-cost in-memory mode, RedLock stampede protection, GZip buffer pooling, and data encryption. | `net8.0`<br/>`net9.0` | [README](./Caching.Helpers/README.md) | [ADR-001](./docs/ADR-001-arquitetura-ecossistema-datahelpers-e-seguranca.md) |
 | **`TL.AuditLogger`** | Structured audit logging utility for .NET: automatic JSON property diff calculation, pluggable storage backends, and zero-leak event dispatching. | `net8.0`<br/>`net9.0` | [README](./AuditLogger/README.md) | [ADR-003](./docs/adr/ADR-003-pacote-auditlogger.md) |
 | **`TL.Dapper.Helpers`** | Productive Dapper micro-ORM utilities for .NET: transactional Unit of Work, high-speed bulk insert, and generic SQL command repositories. | `net8.0`<br/>`net9.0` | [README](./Dapper.Helpers/README.md) | [ADR-004](./docs/adr/ADR-004-pacote-dapper-helpers.md) |
 | **`TL.PagingFiltering.Helpers`** | Advanced pagination and dynamic filtering library for .NET: Keyset seek pagination O(1), combinable Specification pattern, and dynamic criteria parser. | `net8.0`<br/>`net9.0` | [README](./PagingFiltering.Helpers/README.md) | [ADR-005](./docs/adr/ADR-005-pacote-pagingfiltering-helpers.md) |
@@ -55,7 +54,7 @@ Escolha os módulos desejados e instale via .NET CLI:
 # Mapeamento de Objetos com Expression Trees e Result Pattern
 dotnet add package TL.DataMapping
 
-# Caching Multinível Híbrido (L1/L2), RedLock e GZip
+# Caching Multinível Híbrido (L1/L2), Custo Zero ($0), RedLock, GZip e Criptografia
 dotnet add package TL.Caching.Helpers
 
 # Auditoria Estruturada com Cálculo Automático de Diff JSON
@@ -208,7 +207,7 @@ dotnet run --project Examples/Example.Showcase/Example.Showcase.csproj
 
 A suíte **TL.DataHelpers** foi desenvolvida com foco em **alta performance**, **zero-allocation** nos caminhos críticos (*hot paths*), reciclagem de buffers com `ArrayPool<T>` e delegates compilados com Árvores de Expressão.
 
-A solução conta com **8 suítes de micro-benchmarks científicos** (24 cenários comparativos) auditados via **BenchmarkDotNet v0.14.0**:
+A solução conta com **8 suítes de micro-benchmarks** (24 cenários comparativos) auditados via **BenchmarkDotNet v0.14.0**:
 
 ![Evidência de Execução Real no Terminal com BenchmarkDotNet](assets/benchmark-terminal.png)
 
@@ -229,7 +228,7 @@ dotnet run -c Release --project benchmarks/DataHelpers.Benchmarks
 | **`TL.Dapper.Helpers`** | 1. Gestão de conexões<br>2. Consulta com parâmetros<br>3. Lote transacional | Conexões ADO.NET isoladas | `DapperUnitOfWork` (Reúso de conexão) | Eliminação de roundtrips e reconexões contínuas no pool |
 | **`TL.MongoDriver`** | 1. Projeção de subconjunto<br>2. Filtros Fluentes<br>3. Resolução por `_id` | `new BsonDocument` solto | `MongoQueryRepository` tipado + `Filters.ById` | Menor banda de rede e deserialização instantânea |
 
-> 📖 Para a documentação aprofundada, código-fonte dos cenários, filtros de linha de comando e tabelas completas com desvio padrão e gerações de GC, consulte a [Matriz Científica Exaustiva de Benchmarks](./benchmarks/DataHelpers.Benchmarks/README.md).
+> 📖 Para a documentação aprofundada, código-fonte dos cenários, filtros de linha de comando e tabelas completas com desvio padrão e gerações de GC, consulte o [Relatório de Benchmarks](./benchmarks/DataHelpers.Benchmarks/README.md).
 
 ---
 
@@ -238,6 +237,7 @@ dotnet run -c Release --project benchmarks/DataHelpers.Benchmarks
 Para compreender os padrões de design, trade-offs de desempenho e matriz de compatibilidade do ecossistema:
 - [Visão Geral da Arquitetura & Diagramas C4](./docs/arquitetura/visao-geral.md)
 - [ADR 000: Arquitetura e Convenções Globais da Solução](./docs/adr/ADR-000-arquitetura-e-convencoes.md)
+- [ADR 001: Arquitetura do Ecossistema TL.DataHelpers e Segurança](./docs/ADR-001-arquitetura-ecossistema-datahelpers-e-seguranca.md)
 - [ADR 009: Governança de Compilação, Multi-Targeting e Política de Zero Warnings](./docs/adr/ADR-009-governanca-de-compilacao-multi-targeting-e-zero-warnings.md)
 - [Catálogo Completo de ADRs](./docs/adr/README.md)
 
