@@ -1,104 +1,137 @@
-﻿using Caching.Helpers.Interfaces;
+using System.Text.Json;
+using Caching.Helpers.Compression;
+using Caching.Helpers.Interfaces;
+using Caching.Helpers.Pipeline;
 using Caching.Helpers.Utils;
 using Microsoft.Extensions.Caching.Distributed;
-using System.Text.Json;
 
-namespace Caching.Helpers.Implementations
+namespace Caching.Helpers.Implementations;
+
+/// <summary>
+/// Provedor de cache distribuído baseado no Redis com suporte a pipeline ordenado de compressão e criptografia.
+/// </summary>
+public class RedisCacheService : ICacheService
 {
-    public class RedisCacheService : ICacheService
+    private readonly IDistributedCache _cache;
+    private readonly CachePayloadPipeline _pipeline;
+
+    /// <summary>
+    /// Inicializa uma nova instância de <see cref="RedisCacheService"/>.
+    /// </summary>
+    /// <param name="cache">Instância de cache distribuído.</param>
+    /// <param name="pipeline">Pipeline opcional de compressão e criptografia. Quando nulo, utiliza compressão GZip padrão.</param>
+    public RedisCacheService(IDistributedCache cache, CachePayloadPipeline? pipeline = null)
     {
-        private readonly IDistributedCache _cache;
+        _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        _pipeline = pipeline ?? new CachePayloadPipeline(new GZipCompressionProvider());
+    }
 
-        public RedisCacheService(IDistributedCache cache)
+    /// <inheritdoc/>
+    public async Task<T?> GetAsync<T>(string key, string? region = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var cacheKey = CacheKeyGenerator.GenerateKey(key, region);
+        var data = await _cache.GetAsync(cacheKey);
+        if (data is null)
         {
-            _cache = cache;
+            return default;
         }
 
-        public async Task<T?> GetAsync<T>(string key, string? region = null)
-        {
-            var cacheKey = CacheKeyGenerator.GenerateKey(key, region);
-            var data = await _cache.GetAsync(cacheKey);
-            if (data is null) return default;
-            var jsonData = CompressionHelper.Decompress(data);
-            return JsonSerializer.Deserialize<T>(jsonData);
-        }
+        return _pipeline.Decode<T>(data);
+    }
 
-        public async Task SetAsync<T>(string key, T value, TimeSpan expiration, bool slidingExpiration = false, string? region = null)
+    /// <inheritdoc/>
+    public async Task SetAsync<T>(string key, T value, TimeSpan expiration, bool slidingExpiration = false, string? region = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var options = CreateEntryOptions(expiration, slidingExpiration);
+        var cacheKey = CacheKeyGenerator.GenerateKey(key, region);
+        var payload = _pipeline.Encode(value);
+
+        await _cache.SetAsync(cacheKey, payload, options);
+
+        if (!string.IsNullOrEmpty(region))
         {
-            var options = new DistributedCacheEntryOptions();
-            if (slidingExpiration)
+            await AddKeyToRegionAsync(region, cacheKey);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task RemoveAsync(string key, string? region = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var cacheKey = CacheKeyGenerator.GenerateKey(key, region);
+        await _cache.RemoveAsync(cacheKey);
+
+        if (!string.IsNullOrEmpty(region))
+        {
+            await RemoveKeyFromRegionAsync(region, cacheKey);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task InvalidateRegionAsync(string region)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(region);
+
+        var keys = await GetKeysByRegionAsync(region);
+        foreach (var key in keys)
+        {
+            await _cache.RemoveAsync(key);
+        }
+    }
+
+    private static DistributedCacheEntryOptions CreateEntryOptions(TimeSpan expiration, bool slidingExpiration)
+    {
+        var options = new DistributedCacheEntryOptions();
+        if (slidingExpiration)
+        {
+            options.SlidingExpiration = expiration;
+        }
+        else
+        {
+            options.AbsoluteExpirationRelativeToNow = expiration;
+        }
+        return options;
+    }
+
+    private async Task AddKeyToRegionAsync(string region, string cacheKey)
+    {
+        var regionKey = $"region:{region}";
+        var existingKeys = await _cache.GetStringAsync(regionKey);
+        var keys = existingKeys == null
+            ? new HashSet<string>()
+            : JsonSerializer.Deserialize<HashSet<string>>(existingKeys) ?? new HashSet<string>();
+
+        keys.Add(cacheKey);
+        var updatedKeys = JsonSerializer.Serialize(keys);
+        await _cache.SetStringAsync(regionKey, updatedKeys);
+    }
+
+    private async Task RemoveKeyFromRegionAsync(string region, string cacheKey)
+    {
+        var regionKey = $"region:{region}";
+        var existingKeys = await _cache.GetStringAsync(regionKey);
+        if (existingKeys != null)
+        {
+            var keys = JsonSerializer.Deserialize<HashSet<string>>(existingKeys) ?? new HashSet<string>();
+            if (keys.Remove(cacheKey))
             {
-                options.SlidingExpiration = expiration;
-            }
-            else
-            {
-                options.AbsoluteExpirationRelativeToNow = expiration;
-            }
-
-            var cacheKey = CacheKeyGenerator.GenerateKey(key, region);
-            var jsonData = JsonSerializer.Serialize(value);
-            var compressedData = CompressionHelper.Compress(jsonData);
-            await _cache.SetAsync(cacheKey, compressedData, options);
-            if (!string.IsNullOrEmpty(region))
-            {
-                await AddKeyToRegionAsync(region, cacheKey);
+                var updatedKeys = JsonSerializer.Serialize(keys);
+                await _cache.SetStringAsync(regionKey, updatedKeys);
             }
         }
+    }
 
-        public async Task RemoveAsync(string key, string? region = null)
-        {
-            var cacheKey = CacheKeyGenerator.GenerateKey(key, region);
-            await _cache.RemoveAsync(cacheKey);
-            if (!string.IsNullOrEmpty(region))
-            {
-                await RemoveKeyFromRegionAsync(region, cacheKey);
-            }
-        }
-
-        public async Task InvalidateRegionAsync(string region)
-        {
-            var keys = await GetKeysByRegionAsync(region);
-            foreach (var key in keys)
-            {
-                await _cache.RemoveAsync(key);
-            }
-        }
-
-        private async Task AddKeyToRegionAsync(string region, string cacheKey)
-        {
-            var regionKey = $"region:{region}";
-            var existingKeys = await _cache.GetStringAsync(regionKey);
-            var keys = existingKeys == null
-                ? new HashSet<string>()
-                : JsonSerializer.Deserialize<HashSet<string>>(existingKeys) ?? new HashSet<string>();
-
-            keys.Add(cacheKey);
-            var updatedKeys = JsonSerializer.Serialize(keys);
-            await _cache.SetStringAsync(regionKey, updatedKeys);
-        }
-
-        private async Task RemoveKeyFromRegionAsync(string region, string cacheKey)
-        {
-            var regionKey = $"region:{region}";
-            var existingKeys = await _cache.GetStringAsync(regionKey);
-            if (existingKeys != null)
-            {
-                var keys = JsonSerializer.Deserialize<HashSet<string>>(existingKeys) ?? new HashSet<string>();
-                if (keys.Remove(cacheKey))
-                {
-                    var updatedKeys = JsonSerializer.Serialize(keys);
-                    await _cache.SetStringAsync(regionKey, updatedKeys);
-                }
-            }
-        }
-
-        private async Task<IEnumerable<string>> GetKeysByRegionAsync(string region)
-        {
-            var regionKey = $"region:{region}";
-            var existingKeys = await _cache.GetStringAsync(regionKey);
-            return existingKeys == null
-                ? Enumerable.Empty<string>()
-                : JsonSerializer.Deserialize<IEnumerable<string>>(existingKeys) ?? Enumerable.Empty<string>();
-        }
+    private async Task<IEnumerable<string>> GetKeysByRegionAsync(string region)
+    {
+        var regionKey = $"region:{region}";
+        var existingKeys = await _cache.GetStringAsync(regionKey);
+        return existingKeys == null
+            ? Enumerable.Empty<string>()
+            : JsonSerializer.Deserialize<IEnumerable<string>>(existingKeys) ?? Enumerable.Empty<string>();
     }
 }
