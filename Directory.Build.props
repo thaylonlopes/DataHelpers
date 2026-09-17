@@ -2,7 +2,8 @@
   <PropertyGroup>
     <Version>0.2.0</Version>
     <Authors>Thaylon Lopes</Authors>
-    <Company>Thaylon Lopes</Company>
+    <Company>TL Engenharia</Company>
+    <Product>TL.DataHelpers</Product>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/thaylonlopes/DataHelpers</PackageProjectUrl>
     <RepositoryUrl>https://github.com/thaylonlopes/DataHelpers</RepositoryUrl>
@@ -16,7 +17,7 @@
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageOutputPath>$(MSBuildThisFileDirectory)nupkgs</PackageOutputPath>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)artifacts\packages</PackageOutputPath>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <PackageTags>csharp;dotnet;data-helpers;dapper;mongodb;redis;caching;query-builder;paging</PackageTags>

@@ -1,4 +1,3 @@
-﻿using Apache.Ignite.Core;
 using Caching.Helpers.Configurations;
 using Caching.Helpers.Implementations;
 using Caching.Helpers.Interfaces;
@@ -7,99 +6,156 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Caching.Helpers.Extensions
+namespace Caching.Helpers.Extensions;
+
+/// <summary>
+/// Métodos de extensão para registro de serviços de caching no contêiner de injeção de dependência.
+/// </summary>
+public static class CacheServiceExtensions
 {
-    public static class CacheServiceExtensions
+    /// <summary>
+    /// Registra o provedor de cache padrão da suíte TL.DataHelpers com alternância transparente entre Redis e Modo Custo Zero ($0).
+    /// </summary>
+    /// <param name="services">Coleção de serviços do contêiner.</param>
+    /// <param name="configuration">Configuração da aplicação.</param>
+    /// <returns>A coleção de serviços configurada.</returns>
+    public static IServiceCollection AddTlCaching(this IServiceCollection services, IConfiguration configuration)
     {
-        public static IServiceCollection AddRedisCache(this IServiceCollection services, IConfiguration configuration)
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var useRedis = ResolveUseRedis(configuration);
+        var connectionString = ResolveRedisConnectionString(configuration);
+
+        if (useRedis && !string.IsNullOrWhiteSpace(connectionString))
         {
-            var cacheSettings = configuration.GetSection("CacheSettings").Get<CacheSettings>()
-                ?? throw new InvalidOperationException("CacheSettings configuration section is missing or invalid.");
-
-            if (string.IsNullOrWhiteSpace(cacheSettings.RedisConnectionString))
-            {
-                throw new InvalidOperationException("Redis connection string is not configured.");
-            }
-
-            services.AddStackExchangeRedisCache(options =>
-            {
-                options.Configuration = cacheSettings.RedisConnectionString;
-            });
-
-            services.AddSingleton<ICacheService, RedisCacheService>();
-            return services;
+            RegisterRedisProvider(services, connectionString);
+        }
+        else
+        {
+            RegisterMemoryProvider(services);
         }
 
-        public static IServiceCollection AddMemcachedCache(this IServiceCollection services, IConfiguration configuration)
-        {
-            var cacheSettings = configuration.GetSection("CacheSettings").Get<CacheSettings>()
-                ?? throw new InvalidOperationException("CacheSettings configuration section is missing or invalid.");
+        return services;
+    }
 
-            if (string.IsNullOrWhiteSpace(cacheSettings.MemcachedServer))
-            {
-                throw new InvalidOperationException("Memcached server is not configured.");
-            }
+    /// <summary>
+    /// Registra explicitamente o provedor distribuído Redis.
+    /// </summary>
+    /// <param name="services">Coleção de serviços do contêiner.</param>
+    /// <param name="configuration">Configuração da aplicação.</param>
+    /// <returns>A coleção de serviços configurada.</returns>
+    public static IServiceCollection AddRedisCache(this IServiceCollection services, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
 
-            services.AddEnyimMemcached(options =>
-            {
-                options.AddServer(cacheSettings.MemcachedServer, 11211);
-            });
-
-            services.AddSingleton<ICacheService, MemcachedCacheService>();
-            return services;
-        }
-        public static async Task<IServiceCollection> AddCacheWithPrimingAsync(this IServiceCollection services, Dictionary<string, object> dataToPreload)
+        var connectionString = ResolveRedisConnectionString(configuration);
+        if (string.IsNullOrWhiteSpace(connectionString))
         {
-            services.AddSingleton<ICachePrimingService, CachePrimingService>();
-            var serviceProvider = services.BuildServiceProvider();
-            var cachePrimingService = serviceProvider.GetRequiredService<ICachePrimingService>();
-
-            await cachePrimingService.PreloadCacheAsync(dataToPreload);
-            return services;
-        }
-        public static IServiceCollection AddThrottledCache(this IServiceCollection services, int numberOfExecutions, TimeSpan perTimeSpan)
-        {
-            services.AddSingleton<ICacheService>(sp =>
-            {
-                var innerCacheService = new RedisCacheService(sp.GetRequiredService<IDistributedCache>());
-                return new ThrottledCacheService(innerCacheService, numberOfExecutions, perTimeSpan);
-            });
-            return services;
-        }
-        public static IServiceCollection AddDistributedLockingCache<T>(this IServiceCollection services, string connectionString) where T : class, ICacheService
-        {
-            RedisLockFactory.Initialize(connectionString);
-
-            services.AddSingleton<ICacheService>(sp =>
-            {
-                var innerCacheService = sp.GetRequiredService<T>();
-                return new LockedCacheService(innerCacheService);
-            });
-            return services;
-
-        }
-        public static IServiceCollection AddSQLiteCache(this IServiceCollection services)
-        {
-            services.AddSingleton<ICacheService, SQLiteCacheService>();
-            return services;
-        }
-        public static IServiceCollection AddNCache(this IServiceCollection services, string cacheName)
-        {
-            services.AddSingleton<ICacheService>(sp =>
-            {
-                return new NCacheService(cacheName);
-            });
-            return services;
-        }
-        public static IServiceCollection AddIgniteCache(this IServiceCollection services)
-        {
-            services.AddSingleton<ICacheService>(sp =>
-            {
-                var ignite = Ignition.Start();
-                return new IgniteCacheService(ignite);
-            });
-            return services;
+            throw new InvalidOperationException("Redis connection string is not configured.");
         }
 
+        RegisterRedisProvider(services, connectionString);
+        return services;
+    }
+
+    /// <summary>
+    /// Registra explicitamente o provedor em memória local Modo Custo Zero ($0).
+    /// </summary>
+    /// <param name="services">Coleção de serviços do contêiner.</param>
+    /// <returns>A coleção de serviços configurada.</returns>
+    public static IServiceCollection AddMemoryCacheService(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        RegisterMemoryProvider(services);
+        return services;
+    }
+
+    /// <summary>
+    /// Pré-carrega dados no cache durante a inicialização da aplicação.
+    /// </summary>
+    public static async Task<IServiceCollection> AddCacheWithPrimingAsync(this IServiceCollection services, Dictionary<string, object> dataToPreload)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(dataToPreload);
+
+        services.AddSingleton<ICachePrimingService, CachePrimingService>();
+        var serviceProvider = services.BuildServiceProvider();
+        var cachePrimingService = serviceProvider.GetRequiredService<ICachePrimingService>();
+
+        await cachePrimingService.PreloadCacheAsync(dataToPreload);
+        return services;
+    }
+
+    /// <summary>
+    /// Registra decorador de controle de vazão (throttling) para chamadas ao cache.
+    /// </summary>
+    public static IServiceCollection AddThrottledCache(this IServiceCollection services, int numberOfExecutions, TimeSpan perTimeSpan)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddSingleton<ICacheService>(sp =>
+        {
+            var innerCacheService = new RedisCacheService(sp.GetRequiredService<IDistributedCache>());
+            return new ThrottledCacheService(innerCacheService, numberOfExecutions, perTimeSpan);
+        });
+        return services;
+    }
+
+    /// <summary>
+    /// Registra decorador de locking distribuído anti-stampede.
+    /// </summary>
+    public static IServiceCollection AddDistributedLockingCache<T>(this IServiceCollection services, string connectionString) where T : class, ICacheService
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+
+        RedisLockFactory.Initialize(connectionString);
+
+        services.AddSingleton<ICacheService>(sp =>
+        {
+            var innerCacheService = sp.GetRequiredService<T>();
+            return new LockedCacheService(innerCacheService);
+        });
+        return services;
+    }
+
+    /// <summary>
+    /// Registra provedor baseado em SQLite para persistência em arquivo local.
+    /// </summary>
+    public static IServiceCollection AddSQLiteCache(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddSingleton<ICacheService, SQLiteCacheService>();
+        return services;
+    }
+
+    private static bool ResolveUseRedis(IConfiguration configuration)
+    {
+        return configuration.GetValue<bool?>("Cache:UseRedis")
+            ?? configuration.GetValue<bool?>("CacheSettings:UseRedis")
+            ?? false;
+    }
+
+    private static string? ResolveRedisConnectionString(IConfiguration configuration)
+    {
+        return configuration.GetValue<string>("Cache:RedisConnectionString")
+            ?? configuration.GetValue<string>("CacheSettings:RedisConnectionString");
+    }
+
+    private static void RegisterRedisProvider(IServiceCollection services, string connectionString)
+    {
+        services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = connectionString;
+        });
+        services.AddSingleton<ICacheService, RedisCacheService>();
+    }
+
+    private static void RegisterMemoryProvider(IServiceCollection services)
+    {
+        services.AddMemoryCache();
+        services.AddSingleton<ICacheService, MemoryCacheService>();
     }
 }

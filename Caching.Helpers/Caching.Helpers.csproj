@@ -13,11 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Apache.Ignite" />
-    <PackageReference Include="EntityFrameworkCore.NCache" />
-    <PackageReference Include="EnyimMemcachedCore" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
     <PackageReference Include="Polly" />
     <PackageReference Include="prometheus-net" />
