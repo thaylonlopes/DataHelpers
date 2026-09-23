@@ -60,7 +60,7 @@ public static class Program
         var exporter = new CsvDataExporter(csvSettings);
         await exporter.ExportAsync(tempCsvPath, sampleOrders);
 
-        var logger = new SimpleLogger();
+        var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
         var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
             HasHeaderRecord = true,

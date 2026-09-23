@@ -1,9 +1,10 @@
 using DataImportExport.Helpers;
 using DataImportExport.Helpers.Models;
+using Microsoft.Extensions.Logging.Abstractions;
 
 Console.WriteLine("=== Demo: TL.DataImportExport.Helpers ===");
 
-var logger = new SimpleLogger();
+var logger = NullLogger.Instance;
 var config = new JsonConfigurationOptions();
 var exporter = new JsonDataExporter(logger, config);
 var importer = new JsonDataImporter(logger, config);

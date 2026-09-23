@@ -25,7 +25,9 @@ dotnet add package TL.PagingFiltering.Helpers
 
 | Categoria | Componentes & Métodos | Descrição |
 | :--- | :--- | :--- |
-| **Keyset Seek Pagination** | `ApplyKeyset()`, `PagedResultKeyset<T, TKey>` | Navegação contínua \(O(1)\) baseada na chave do último elemento, eliminando lentidão de `OFFSET` em tabelas massivas. |
+| **Keyset Seek Composto** | `KeysetSeekBuilder<T>`, `ApplyKeysetComposite()` | Construtor fluente para busca baseada em chaves com múltiplas colunas e ordenação mista (ex: Data DESC, Id ASC), com validação defensiva `NOT NULL`. |
+| **Keyset Seek Simples** | `ApplyKeyset()`, `PagedResultKeyset<T, TKey>` | Navegação contínua baseada na chave do último elemento, eliminando a degradação de `OFFSET` em tabelas volumosas. |
+| **Proteção de Propriedades** | `[FilterIgnore]` | Atributo declarativo em propriedades sensíveis que bloqueia filtros indevidos via `DynamicFilterParser` com `SecurityException`. |
 | **Specification Pattern** | `Specification<T>`, `And()`, `Or()`, `Not()` | Composição fluente de regras de negócio em expressões LINQ, utilizando `ParameterReplacer` para consistência. |
 | **Parser Dinâmico** | `DynamicFilterParser`, `FilterCriterion` | Mapeamento tipado de filtros de requisição HTTP (Equals, Contains, GreaterThan) para expressões C#. |
 | **Paginação por Cursor** | `PagedResultCursor<T>` | Formatação padronizada de envelopes de resposta com cursores anterior e próximo para APIs REST. |
@@ -35,22 +37,39 @@ dotnet add package TL.PagingFiltering.Helpers
 
 ## 💡 Exemplos de Uso
 
-### 1. Keyset Seek Pagination \(O(1)\)
+### 1. Paginação Baseada em Chaves (Keyset Seek Composto)
 
 ```csharp
+using PagingFiltering.Helpers.Builders;
 using PagingFiltering.Helpers.Extensions;
 
-IQueryable<Produto> produtosQuery = dbContext.Produtos.AsQueryable();
+IQueryable<Pedido> pedidosQuery = dbContext.Pedidos.AsQueryable();
 
-// Consulta rápida sem OFFSET para alimentar feeds infinitos
-var resultadoKeyset = produtosQuery.ApplyKeyset(
-    keySelector: p => p.Id,
-    afterKey: ultimoIdVisto,
+// Ordenação mista composta: DataCriacao DESC, Id ASC
+var seekBuilder = new KeysetSeekBuilder<Pedido>()
+    .OrderBy(p => p.DataCriacao, ascending: false)
+    .ThenBy(p => p.Id, ascending: true);
+
+var pagina = pedidosQuery.ApplyKeysetComposite(
+    seekBuilder,
+    lastSeenValues: new object[] { ultimoTimestampVisto, ultimoIdVisto },
     pageSize: 20
 );
+```
 
-Console.WriteLine($"Próxima Chave: {resultadoKeyset.NextKey}");
-Console.WriteLine($"Mais Itens Disponíveis: {resultadoKeyset.HasMore}");
+### 2. Blindagem de Propriedades com `[FilterIgnore]`
+
+```csharp
+using PagingFiltering.Helpers.Attributes;
+
+public class Usuario
+{
+    public int Id { get; set; }
+    public string Nome { get; set; } = string.Empty;
+
+    [FilterIgnore]
+    public string SenhaHash { get; set; } = string.Empty; // Bloqueado contra filtros dinâmicos externos
+}
 ```
 
 ### 2. Composição Fluente com Specification Pattern

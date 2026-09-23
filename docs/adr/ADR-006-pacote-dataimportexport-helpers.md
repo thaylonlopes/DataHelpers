@@ -31,11 +31,25 @@ O pacote `TL.DataImportExport.Helpers` foi desenvolvido para unificar a ingestã
 - **JSON:** `System.Text.Json` de alto throughput com zero overhead de conversão intermediária.
 - **XML:** Streaming nativo tipado com segurança defensiva contra XXE (*XML External Entity*).
 
+### 4. Adoção de ILogger Nativo da BCL e Erradicação de Console.WriteLine (v0.4.0)
+- Expurgo de implementações manuais de logging (`SimpleLogger`) e de chamadas diretas a `Console.WriteLine` (Regra #8).
+- Adoção estrita de `Microsoft.Extensions.Logging.ILogger` com default `NullLogger.Instance`, viabilizando integração transparente com Serilog, OpenTelemetry e Application Insights.
+
+### 5. Mitigação de Injeção de Fórmulas em Arquivos CSV (v0.4.0)
+- Implementação de `SafeCsvFormulaStringConverter` integrado ao pipeline de escrita do `CsvHelper`.
+- Sanitização preventiva: qualquer célula de texto que inicie com os caracteres perigosos `=`, `+`, `-`, `@`, `\t` ou `\r` é prefixada com apóstrofo seguro (`'`), neutralizando execuções de comandos arbitrários e fórmulas dinâmicas ao abrir relatórios no Excel ou Calc.
+
+### 6. Guardrail de Memória no ClosedXML (v0.4.0)
+- O `ClosedXML` instancia todo o modelo DOM da planilha em memória Heap, gerando risco de esgotamento de memória em planilhas volumosas.
+- Implementação da propriedade `MaxRowsLimit` (padrão 15.000 linhas) no `ExcelDataImporter`. Se o volume ultrapassar o teto, a leitura é abortada imediatamente com `InvalidOperationException` defensiva, instruindo o uso de streaming CSV via `SpanDelimitedParser`.
+
 ---
 
 ## Consequências e Trade-offs
 
 - **Universalidade:** Capacidade de importar e exportar os 4 principais formatos corporativos através de APIs homogêneas.
-- **Eficiência de Memória:** O fluxo em streaming viabiliza o processamento de planilhas e arquivos densos com uso estável de memória.
-- **Trade-off de Dependências:** O pacote inclui dependências consolidadas (`ClosedXML`, `CsvHelper`), justificadas pelo suporte robusto aos padrões e normas de arquivos corporativos.
+- **Segurança em Exportação e Importação:** Proteção nativa contra execução indevida de fórmulas em arquivos CSV e ataques de entidade externa (XXE) em XML.
+- **Proteção de Recursos:** Guardrail determinístico no Excel previne esgotamento de memória em ambientes conteinerizados ou servidores de recursos limitados.
+- **Logging Corporativo Limpo:** Zero poluição em `Console.Out` e rastreamento via `ILogger` padrão do ecossistema .NET.
+
 

@@ -25,6 +25,9 @@ dotnet add package TL.DataImportExport.Helpers
 
 | Categoria | Componentes & Métodos | Descrição |
 | :--- | :--- | :--- |
+| **Sanitização de CSV** | `SafeCsvFormulaStringConverter` | Sanitização preventiva em células CSV prefixando strings que iniciam com `=`, `+`, `-`, `@`, `\t`, `\r` com `'` para neutralizar execução indevida de fórmulas. |
+| **Guardrail de Memória Excel** | `MaxRowsLimit` (ClosedXML) | Limite configurável (padrão 15.000 linhas) no `ExcelDataImporter` disparando `InvalidOperationException` defensiva contra Out-Of-Memory (OOM). |
+| **Logging Corporativo BCL** | `Microsoft.Extensions.Logging.ILogger` | Integração universal com `ILogger` e fallback seguro para `NullLogger.Instance`, erradicando `Console.WriteLine`. |
 | **Manipulação de CSV** | `CsvDataImporter`, `CsvDataExporter` | Leitura e escrita via streaming baseadas no `CsvHelper`, com suporte a delimitadores e encodings customizados. |
 | **Planilhas Excel (XLSX)** | `ExcelDataImporter`, `ExcelDataExporter` | Geração e parsing de planilhas formatadas via `ClosedXML` sem dependência de dependências nativas. |
 | **Streaming JSON** | `JsonDataImporter`, `JsonDataExporter` | Processamento assíncrono de grandes arrays JSON diretamente a partir de `Stream` com `System.Text.Json`. |
