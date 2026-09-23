@@ -20,7 +20,6 @@ public static class DataImportExportExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddSingleton<ILogger, SimpleLogger>();
         services.AddSingleton(new CsvSettings());
         services.AddSingleton(new JsonConfigurationOptions());
         services.AddSingleton(new CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true });

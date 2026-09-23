@@ -1,5 +1,6 @@
-﻿using CsvHelper;
+using CsvHelper;
 using CsvHelper.Configuration;
+using CsvHelper.TypeConversion;
 using DataImportExport.Helpers.Exceptions;
 using DataImportExport.Helpers.Interfaces;
 using DataImportExport.Helpers.Models;
@@ -28,11 +29,27 @@ namespace DataImportExport.Helpers
             {
                 using var writer = new StreamWriter(filePath);
                 using var csv = new CsvWriter(writer, _config);
+                csv.Context.TypeConverterCache.AddConverter<string>(new SafeCsvFormulaStringConverter());
                 await csv.WriteRecordsAsync(data);
             }
             catch (Exception ex)
             {
                 throw new DataImportExportException($"Failed to export CSV data to {filePath}", ex);
+            }
+        }
+
+        private sealed class SafeCsvFormulaStringConverter : DefaultTypeConverter
+        {
+            private static readonly char[] DangerousFormulaPrefixes = { '=', '+', '-', '@', '\t', '\r' };
+
+            public override string? ConvertToString(object? value, IWriterRow row, MemberMapData memberMapData)
+            {
+                var str = base.ConvertToString(value, row, memberMapData);
+                if (!string.IsNullOrEmpty(str) && DangerousFormulaPrefixes.Contains(str[0]))
+                {
+                    return "'" + str;
+                }
+                return str;
             }
         }
     }

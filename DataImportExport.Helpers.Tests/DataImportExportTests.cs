@@ -5,6 +5,9 @@ using CsvHelper.Configuration;
 using DataImportExport.Helpers;
 using DataImportExport.Helpers.Models;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Xunit;
 
 namespace DataImportExport.Helpers.Tests;
@@ -25,7 +28,7 @@ public class DataImportExportTests
         var csvSettings = new CsvSettings();
         var exporter = new CsvDataExporter(csvSettings);
         var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture);
-        var logger = new SimpleLogger();
+        ILogger logger = NullLogger.Instance;
         var importer = new CsvDataImporter(logger, csvConfig, csvSettings);
 
         var records = new List<SampleRecord>
@@ -58,7 +61,7 @@ public class DataImportExportTests
     public async Task JsonExporterAndImporter_ShouldExportAndImportCorrectly()
     {
         var tempFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.json");
-        var logger = new SimpleLogger();
+        ILogger logger = NullLogger.Instance;
         var config = new JsonConfigurationOptions();
         var exporter = new JsonDataExporter(logger, config);
         var importer = new JsonDataImporter(logger, config);
@@ -237,5 +240,122 @@ public class DataImportExportTests
         var output = stringWriter.ToString();
         output.Should().Contain("1;Produto A;100.50");
         output.Should().Contain("2;Produto B;250.00");
+    }
+
+    private class TestDataHandler : DataHandlerBase
+    {
+        public TestDataHandler(ILogger logger) : base(logger) { }
+
+        public Task RunFailingOperationAsync()
+        {
+            return ExecuteWithErrorHandling(() => throw new InvalidOperationException("Falha simulada"), "TesteOp");
+        }
+    }
+
+    [Fact]
+    public async Task DataHandlerBase_ShouldLogUsingILogger_WithoutConsoleOutput()
+    {
+        var mockLogger = new Mock<ILogger>();
+        var handler = new TestDataHandler(mockLogger.Object);
+
+        var originalOut = Console.Out;
+        using var stringWriter = new StringWriter();
+        Console.SetOut(stringWriter);
+
+        try
+        {
+            var act = () => handler.RunFailingOperationAsync();
+            await act.Should().ThrowAsync<InvalidOperationException>();
+
+            stringWriter.ToString().Should().BeEmpty();
+            mockLogger.Verify(
+                x => x.Log(
+                    LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((v, t) => true),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Once);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
+
+    public class FormulaRecord
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Payload { get; set; } = string.Empty;
+    }
+
+    [Fact]
+    public async Task CsvDataExporter_ShouldSanitizeCsvFormulaInjection_CWE1236()
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.csv");
+        var exporter = new CsvDataExporter(new CsvSettings());
+
+        var maliciousRecords = new List<FormulaRecord>
+        {
+            new() { Id = "1", Payload = "=cmd|' /C calc'!A0" },
+            new() { Id = "2", Payload = "+12345" },
+            new() { Id = "3", Payload = "-50.00" },
+            new() { Id = "4", Payload = "@SUM(A1:A10)" },
+            new() { Id = "5", Payload = "\tTabInjected" },
+            new() { Id = "6", Payload = "NormalValue" }
+        };
+
+        try
+        {
+            await exporter.ExportAsync(tempFile, maliciousRecords);
+            var content = await File.ReadAllTextAsync(tempFile);
+
+            content.Should().Contain("'=cmd|' /C calc'!A0");
+            content.Should().Contain("'+12345");
+            content.Should().Contain("'-50.00");
+            content.Should().Contain("'@SUM(A1:A10)");
+            content.Should().Contain("'\tTabInjected");
+            content.Should().Contain("NormalValue");
+            content.Should().NotContain("'NormalValue");
+        }
+        finally
+        {
+            if (File.Exists(tempFile))
+                File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task ExcelDataImporter_ExceedingMaxRowsLimit_ShouldThrowInvalidOperationException()
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.xlsx");
+
+        try
+        {
+            using (var workbook = new XLWorkbook())
+            {
+                var ws = workbook.Worksheets.Add("Dados");
+                ws.Cell(1, 1).Value = "Id";
+                ws.Cell(1, 2).Value = "Nome";
+
+                for (int i = 1; i <= 10; i++)
+                {
+                    ws.Cell(i + 1, 1).Value = i;
+                    ws.Cell(i + 1, 2).Value = $"Item {i}";
+                }
+                workbook.SaveAs(tempFile);
+            }
+
+            var importer = new ExcelDataImporter(maxRowsLimit: 5);
+            var act = () => importer.ImportAsync<SampleRecord>(tempFile);
+
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*limite de segurança de 5 linhas*SpanDelimitedParser*OOM*");
+        }
+        finally
+        {
+            if (File.Exists(tempFile))
+                File.Delete(tempFile);
+        }
     }
 }

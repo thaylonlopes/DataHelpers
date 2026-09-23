@@ -1,4 +1,5 @@
-﻿using DataImportExport.Helpers.Interfaces;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DataImportExport.Helpers
 {
@@ -6,9 +7,9 @@ namespace DataImportExport.Helpers
     {
         protected readonly ILogger _logger;
 
-        protected DataHandlerBase(ILogger logger)
+        protected DataHandlerBase(ILogger? logger = null)
         {
-            _logger = logger;
+            _logger = logger ?? NullLogger.Instance;
         }
 
         protected async Task ExecuteWithErrorHandling(Func<Task> action, string operation)
@@ -19,7 +20,7 @@ namespace DataImportExport.Helpers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error during {operation}");
+                _logger.LogError(ex, "Error during {Operation}", operation);
                 throw;
             }
         }
@@ -32,7 +33,7 @@ namespace DataImportExport.Helpers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error during {operation}");
+                _logger.LogError(ex, "Error during {Operation}", operation);
                 throw;
             }
         }

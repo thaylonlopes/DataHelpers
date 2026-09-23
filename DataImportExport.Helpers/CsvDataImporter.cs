@@ -1,7 +1,8 @@
-﻿using CsvHelper;
+using CsvHelper;
 using CsvHelper.Configuration;
 using DataImportExport.Helpers.Interfaces;
 using DataImportExport.Helpers.Models;
+using Microsoft.Extensions.Logging;
 
 namespace DataImportExport.Helpers
 {
@@ -10,7 +11,7 @@ namespace DataImportExport.Helpers
         private readonly CsvConfiguration _config;
         private readonly CsvSettings _settings;
 
-        public CsvDataImporter(ILogger logger, CsvConfiguration config, CsvSettings settings) : base(logger)
+        public CsvDataImporter(ILogger? logger, CsvConfiguration config, CsvSettings settings) : base(logger)
         {
             _config = config;
             _settings = settings;

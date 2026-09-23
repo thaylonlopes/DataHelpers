@@ -4,10 +4,33 @@ using DataImportExport.Helpers.Interfaces;
 namespace DataImportExport.Helpers;
 
 /// <summary>
-/// Importador de dados em formato Excel (XLSX) utilizando ClosedXML.
+/// Importador de dados em formato Excel (XLSX) utilizando ClosedXML com guardrail de memória contra OOM.
 /// </summary>
 public class ExcelDataImporter : IDataImporter
 {
+    /// <summary>
+    /// Limite padrão de segurança de linhas para importação Excel (15.000 linhas).
+    /// </summary>
+    public const int DefaultMaxRowsLimit = 15_000;
+
+    /// <summary>
+    /// Limite máximo configurado de linhas de dados suportadas antes de disparar exceção preventiva de OOM.
+    /// </summary>
+    public int MaxRowsLimit { get; }
+
+    /// <summary>
+    /// Inicializa uma nova instância de <see cref="ExcelDataImporter"/>.
+    /// </summary>
+    /// <param name="maxRowsLimit">Limite máximo de linhas permitido (padrão 15.000).</param>
+    public ExcelDataImporter(int maxRowsLimit = DefaultMaxRowsLimit)
+    {
+        if (maxRowsLimit <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxRowsLimit), "O limite máximo de linhas deve ser maior que zero.");
+        }
+        MaxRowsLimit = maxRowsLimit;
+    }
+
     /// <inheritdoc/>
     public Task<IEnumerable<T>> ImportAsync<T>(string filePath) where T : new()
     {
@@ -29,6 +52,14 @@ public class ExcelDataImporter : IDataImporter
             return Task.FromResult(Enumerable.Empty<T>());
         }
 
+        var dataRowCount = rows.Count - 1;
+        if (dataRowCount > MaxRowsLimit)
+        {
+            throw new InvalidOperationException(
+                $"O arquivo Excel ultrapassa o limite de segurança de {MaxRowsLimit} linhas ({dataRowCount} linhas encontradas). " +
+                "Para volumes massivos, utilize o importador CSV via streaming (SpanDelimitedParser) para prevenir esgotamento de memória (OOM).");
+        }
+
         var headerRow = rows[0];
         var headers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var cell in headerRow.Cells())
@@ -36,7 +67,7 @@ public class ExcelDataImporter : IDataImporter
             headers[cell.GetString()] = cell.Address.ColumnNumber;
         }
 
-        var records = new List<T>();
+        var records = new List<T>(dataRowCount);
         var properties = typeof(T).GetProperties();
 
         foreach (var row in rows.Skip(1))

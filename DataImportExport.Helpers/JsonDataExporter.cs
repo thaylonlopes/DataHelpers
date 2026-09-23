@@ -1,5 +1,6 @@
-﻿using DataImportExport.Helpers.Interfaces;
+using DataImportExport.Helpers.Interfaces;
 using DataImportExport.Helpers.Models;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace DataImportExport.Helpers
@@ -8,7 +9,7 @@ namespace DataImportExport.Helpers
     {
         private readonly JsonConfigurationOptions _config;
 
-        public JsonDataExporter(ILogger logger, JsonConfigurationOptions config) : base(logger)
+        public JsonDataExporter(ILogger? logger, JsonConfigurationOptions config) : base(logger)
         {
             _config = config;
         }
