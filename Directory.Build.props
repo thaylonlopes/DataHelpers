@@ -1,6 +1,6 @@
-﻿<Project>
+<Project>
   <PropertyGroup>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <Authors>Thaylon Lopes</Authors>
     <Company>TL Engenharia</Company>
     <Product>TL.DataHelpers</Product>

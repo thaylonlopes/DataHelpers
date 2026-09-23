@@ -2,9 +2,6 @@
 
 ---
 
-## Status
-Aprovado (Versão 0.3.0)
-
 ## Contexto
 
 A suíte **TL.DataHelpers** (`DataHelpers.sln`) provê componentes de infraestrutura de alta performance para acesso a dados, caching distribuído, auditoria e manipulação de fluxos de dados em .NET 8 e .NET 9.
@@ -12,7 +9,7 @@ A suíte **TL.DataHelpers** (`DataHelpers.sln`) provê componentes de infraestru
 Com a evolução para a versão 0.3.0, identificou-se a necessidade de sanear débitos arquiteturais e elevar os padrões de segurança e sustentabilidade financeira (FinOps):
 1. **Inchaço de Dependências Obsoletas:** A presença de pacotes legados e não-mantidos (`Apache.Ignite`, `EntityFrameworkCore.NCache`, `EnyimMemcachedCore`) agregava mais de 80 MB de dependências transitivas, bibliotecas Java acopladas e arquivos proprietários órfãos (`.ncconf`).
 2. **Custo de Infraestrutura para Aplicações Pequenas:** Ambientes de desenvolvimento, testes e microsserviços de baixo volume demandavam a instanciação dispendiosa de clusters Redis para manter a mesma interface de caching.
-3. **Riscos de Segurança em Repouso (AppSec / LGPD / PCI-DSS):** A persistência de dados no Redis em formato serializado claro expõe dados sensíveis (PII, tokens de sessão) a dumps de memória, vazamentos de arquivos de persistência (RDB/AOF) ou invasões de cluster.
+3. **Riscos de Segurança em Repouso:** A persistência de dados no Redis em formato serializado claro expõe dados sensíveis (PII, tokens de sessão) a dumps de memória, vazamentos de arquivos de persistência (RDB/AOF) ou acesso indevido ao cluster.
 4. **Cache Stampede e Avalanches de Expiração:** Em sistemas de alto tráfego, expirações síncronas de chaves quentes sobrecarregam bancos de dados relacionais (*thundering herd*), exigindo coordenação distribuída e dispersão temporal.
 
 ---
@@ -51,19 +48,50 @@ Com a evolução para a versão 0.3.0, identificou-se a necessidade de sanear d�
 
 ---
 
-## Consequências e Benefícios
+## Decisões Arquiteturais Canônicas — Release v0.4.0 (Persistência, NoSQL & Segurança)
 
-| Aspecto | Antes (v0.2.0) | Depois (v0.3.0) |
-| :--- | :--- | :--- |
-| **Pegada Binária** | Dependências proprietárias NCache/Ignite (> 80 MB) | Pacote limpo, leve e 100% aderente a padrões abertos do .NET |
-| **Custo de Nuvem** | Redis obrigatório para rodar a suíte | Modo Custo Zero ($0) via `IMemoryCache` nativo |
-| **Segurança em Repouso** | JSON claro armazenado no Redis | Criptografia e proteção de dados em repouso |
-| **Eficiência de Rede** | Payloads trafegados sem otimização de pool | Redução > 60% com GZip e reciclagem via `ArrayPool` |
-| **Disponibilidade** | Risco de falha se Redis oscilar | Silent Fallback resiliente sem interrupção de serviço |
+### 6. Desacoplamento de Caching e Especialização em Keyset Seek (`TL.KeysetPagination`)
+- **Remoção de Dependências Obsoletas:** Expurgo de `ICacheService` e `Microsoft.Extensions.Caching.*` do pacote de paginação, saneando acoplamentos indevidos de camadas e mantendo foco estrito em paginação.
+- **Validação Defensiva de Não-Nulidade:** Em chaves de busca para seek keyset, colunas anuláveis (`Nullable`) disparam `InvalidOperationException`, prevenindo ordenação inconsistente e perda de ponteiro de paginação em grandes volumes de dados.
+- **Proteção contra Exposição de Dados via `[FilterIgnore]`:** Atributo de anotação declarativa em propriedades sensíveis ou internas. O parser dinâmico (`DynamicFilterParser`) rejeita requisições com `SecurityException` caso o consumidor tente filtrar ou projetar campos anotados com `[FilterIgnore]`.
+
+### 7. Isolamento NoSQL e Validação Dialetal em Consultas (`TL.QueryBuilder`)
+- **Independência de Drivers Externos:** Remoção das referências a `MongoDB.Driver` e `MongoDB.Bson` do `TL.QueryBuilder`. A geração de filtros NoSQL foi reimplementada utilizando recursos nativos da BCL (`System.Text.Json`).
+- **Escape Dialetal Rígido:** Criação do `SqlIdentifierValidator` que valida identificadores contra injeções (`^[a-zA-Z_][a-zA-Z0-9_]*$`) e aplica escape automático por dialeto:
+  - SQL Server: `[identificador]`
+  - PostgreSQL: `"identificador"`
+  - MySQL: `` `identificador` ``
+- **Proteção contra Sobrecarga em Consultas LIKE:** Interceptação no método `WhereLike` com escape de caracteres coringa (`%`, `_`, `[`) para prevenir consultas com parâmetros arbitrários que forçam varreduras completas de tabelas (*full table scan*) em bancos relacionais.
+
+### 8. Adoção Corporativa de `ILogger` e Sanitização em Exportações (`TL.DataImportExport`)
+- **Erradicação de `Console.WriteLine`:** Expurgo de `SimpleLogger` e adoção do `Microsoft.Extensions.Logging.ILogger` padrão da BCL com fallback seguro para `NullLogger.Instance`.
+- **Sanitização de Fórmulas em Exportação CSV:** Sanitização preventiva em células de exportação CSV prefixando strings iniciadas por `=`, `+`, `-`, `@`, `\t`, `\r` com apóstrofo seguro (`'`), prevenindo a execução indevida de comandos e fórmulas dinâmicas ao abrir os arquivos em planilhas eletrônicas.
+- **Guardrail de Memória no ClosedXML:** Adição de `MaxRowsLimit` (padrão 15.000 linhas) no `ExcelDataImporter`, bloqueando o consumo de planilhas abusivas e orientando o uso do `SpanDelimitedParser` via streaming para grandes volumes.
+
+### 9. Transações ACID Multi-Documento e Idempotência BSON (`TL.MongoDriver`)
+- **Transações Explícitas:** Suporte aos métodos `BeginTransactionAsync`, `CommitTransactionAsync` e `RollbackTransactionAsync` gerenciadas pela sessão do Mongo (`IClientSessionHandle`).
+- **Rollback Automático Defensivo:** Mecanismo transacional em `SaveChanges()` que aborta automaticamente a transação ativa sob qualquer falha na lista de comandos pendentes antes de relançar a exceção.
+- **Registro Idempotente de Convenções e Serializadores:** Introdução do `BsonRegistrationHelper` thread-safe que isola e previne conflitos de concorrência (`BsonSerializationException`) durante a inicialização do container de injeção de dependências.
 
 ---
 
-## Conformidade e Governança
-- **LGPD / GDPR / PCI-DSS:** Conformidade comprovada com cifragem de PIIs e sanitização de memória.
-- **SemVer:** Release v0.3.0 com retrocompatibilidade preservada na API pública `ICacheService`.
-- **Multi-Targeting:** Compilação simultânea e limpa para `.NET 8` e `.NET 9` com política de Zero Warnings.
+## Consequências
+
+### Impactos Positivos
+- **Desacoplamento e Redução de Dependências:** O `QueryBuilder` passa a depender apenas de recursos nativos da BCL (`System.Text.Json`), e a paginação foca estritamente em seu papel sem arrastar abstrações de cache.
+- **Previsibilidade e Escalabilidade de Consultas:** A paginação por chaves (Keyset Seek) elimina a sobrecarga de `OFFSET` em tabelas volumosas, mantendo o tempo de consulta estável e indexado.
+- **Transacionalidade e Integridade no NoSQL:** O suporte a transações multi-documento com auto-rollback no `MongoContext` garante que falhas parciais não deixem documentos inconsistentes na base.
+- **Segurança Nativa por Padrão:** Sanitização transparente contra injeção de fórmulas em CSV, escape automático de identificadores e coringas em SQL dinâmico, e bloqueio de consultas em atributos sensíveis via `[FilterIgnore]`.
+- **Padronização de Observabilidade:** Eliminação de saídas diretas em console em favor de `ILogger`, permitindo integração com qualquer provedor de log corporativo.
+
+### Trade-offs e Limitações
+- **Navegação por Cursor:** Keyset pagination não permite saltar diretamente para páginas arbitrárias distantes (ex.: ir direto para a página 50), sendo indicada para navegação sequencial contínua e feeds. Para paginação tradicional com totalização, a biblioteca mantém o utilitário baseado em offset.
+- **Requisitos de Banco:** Transações multi-documento no MongoDB exigem cluster operando em modo Replica Set.
+- **Capacidade de Memória em Planilhas:** A leitura de arquivos Excel pelo ClosedXML mantém o modelo DOM em memória; para arquivos massivos que excedem o guardrail de linhas, deve-se priorizar o uso de CSV via streaming.
+
+---
+
+## Conformidade e Diretrizes Técnicas
+- **Proteção de Dados e Defesa em Profundidade:** Cifragem de dados em repouso no cache, bloqueio de exposição de campos sensíveis em APIs e sanitização de dados exportados.
+- **Multi-Targeting:** Compilação simultânea e limpa para `.NET 8` e `.NET 9` com política estrita de zero warnings.
+
