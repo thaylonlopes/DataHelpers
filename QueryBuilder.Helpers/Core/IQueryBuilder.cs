@@ -12,6 +12,7 @@ public interface IQueryBuilder
     IQueryBuilder Where(string condition);
     IQueryBuilder And(string condition);
     IQueryBuilder Or(string condition);
+    IQueryBuilder WhereLike(string column, string searchTerm, bool escapeWildcards = true);
     IQueryBuilder OrderBy(string column, bool ascending = true);
     IQueryBuilder Limit(int limit);
     IQueryBuilder Offset(int offset);

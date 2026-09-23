@@ -1,4 +1,5 @@
 using QueryBuilder.Helpers.Enums;
+using QueryBuilder.Helpers.Security;
 using System.Text;
 
 namespace QueryBuilder.Helpers.Core;
@@ -22,6 +23,19 @@ public abstract class QueryBuilderBase : IQueryBuilder
     public abstract IQueryBuilder Where(string condition);
     public abstract IQueryBuilder And(string condition);
     public abstract IQueryBuilder Or(string condition);
+
+    public virtual IQueryBuilder WhereLike(string column, string searchTerm, bool escapeWildcards = true)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(column);
+        ArgumentNullException.ThrowIfNull(searchTerm);
+
+        var term = escapeWildcards
+            ? SqlIdentifierValidator.EscapeLikeWildcards(searchTerm)
+            : searchTerm;
+
+        return Where($"{column} LIKE '%{term}%'");
+    }
+
     public abstract IQueryBuilder OrderBy(string column, bool ascending = true);
     public abstract IQueryBuilder Limit(int limit);
     public abstract IQueryBuilder Offset(int offset);

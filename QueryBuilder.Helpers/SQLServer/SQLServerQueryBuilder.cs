@@ -1,5 +1,6 @@
 using QueryBuilder.Helpers.Core;
 using QueryBuilder.Helpers.Enums;
+using QueryBuilder.Helpers.Security;
 using System.Text;
 
 namespace QueryBuilder.Helpers.SQLServer
@@ -43,7 +44,8 @@ namespace QueryBuilder.Helpers.SQLServer
 
         public override IQueryBuilder OrderBy(string column, bool ascending = true)
         {
-            QueryBuilderInternal.Append(" ORDER BY ").Append(column).Append(ascending ? " ASC" : " DESC");
+            var escaped = SqlIdentifierValidator.ValidateAndEscape(column, SqlDialect.SqlServer);
+            QueryBuilderInternal.Append(" ORDER BY ").Append(escaped).Append(ascending ? " ASC" : " DESC");
             return this;
         }
         public override IQueryBuilder Limit(int limit)

@@ -1,4 +1,3 @@
-﻿using MongoDB.Bson;
 using QueryBuilder.Helpers.Core;
 using QueryBuilder.Helpers.Enums;
 using System.Text;
@@ -129,15 +128,18 @@ namespace QueryBuilder.Helpers.MongoDB
 
         public override IQueryBuilder GroupBy(params string[] columns)
         {
-            var groupStage = new BsonDocument
+            var sb = new StringBuilder();
+            sb.Append("{ \"$group\": { \"_id\": { ");
+            if (columns != null)
             {
-                { "_id", new BsonDocument() }
-            };
-            foreach (var column in columns)
-            {
-                groupStage["_id"].AsBsonDocument.Add(column, $"${column}");
+                for (int i = 0; i < columns.Length; i++)
+                {
+                    if (i > 0) sb.Append(", ");
+                    sb.Append($"\"{columns[i]}\": \"${columns[i]}\"");
+                }
             }
-            _aggregationPipeline.Add(JsonDocument.Parse($"{{ \"$group\": {groupStage.ToJson()} }}"));
+            sb.Append(" } } }");
+            _aggregationPipeline.Add(JsonDocument.Parse(sb.ToString()));
             return this;
         }
 

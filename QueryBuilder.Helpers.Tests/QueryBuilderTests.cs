@@ -1,3 +1,4 @@
+using System.Security;
 using System.Text.Json;
 using FluentAssertions;
 using QueryBuilder.Helpers.DynamoDB;
@@ -6,6 +7,7 @@ using QueryBuilder.Helpers.MongoDB;
 using QueryBuilder.Helpers.MySQL;
 using QueryBuilder.Helpers.Oracle;
 using QueryBuilder.Helpers.PostgreSQL;
+using QueryBuilder.Helpers.Security;
 using QueryBuilder.Helpers.SQLServer;
 using Xunit;
 
@@ -26,7 +28,7 @@ public class QueryBuilderTests
             .OrderBy("Preco", ascending: false)
             .BuildQuery();
 
-        sql.Should().Be("SELECT Id, Nome, Preco FROM Produtos WHERE Ativo = 1 AND Preco > 50 ORDER BY Preco DESC");
+        sql.Should().Be("SELECT Id, Nome, Preco FROM Produtos WHERE Ativo = 1 AND Preco > 50 ORDER BY [Preco] DESC");
     }
 
     [Fact]
@@ -216,5 +218,74 @@ public class QueryBuilderTests
 
             query.Should().Contain("SELECT Categoria, Status FROM Pedidos GROUP BY Categoria, Status");
         }
+    }
+
+    [Fact]
+    public void SqlIdentifierValidator_ShouldValidateAndEscapeDialects()
+    {
+        SqlIdentifierValidator.ValidateAndEscape("Preco", SqlDialect.SqlServer).Should().Be("[Preco]");
+        SqlIdentifierValidator.ValidateAndEscape("Preco", SqlDialect.PostgreSql).Should().Be("\"Preco\"");
+        SqlIdentifierValidator.ValidateAndEscape("Preco", SqlDialect.MySql).Should().Be("`Preco`");
+        SqlIdentifierValidator.ValidateAndEscape("Preco", SqlDialect.Oracle).Should().Be("\"Preco\"");
+
+        SqlIdentifierValidator.ValidateAndEscape("u.Email", SqlDialect.SqlServer).Should().Be("[u].[Email]");
+        SqlIdentifierValidator.ValidateAndEscape("u.Email", SqlDialect.PostgreSql).Should().Be("\"u\".\"Email\"");
+        SqlIdentifierValidator.ValidateAndEscape("u.Email", SqlDialect.MySql).Should().Be("`u`.`Email`");
+    }
+
+    [Theory]
+    [InlineData("Id; DROP TABLE Usuarios--")]
+    [InlineData("Nome' OR '1'='1")]
+    [InlineData("Preco/*injetado*/")]
+    [InlineData("Coluna\\Invalida")]
+    [InlineData("123Invalido")]
+    public void SqlIdentifierValidator_ShouldThrowSecurityException_OnMaliciousInput(string maliciousInput)
+    {
+        var act = () => SqlIdentifierValidator.Validate(maliciousInput);
+        act.Should().Throw<SecurityException>();
+    }
+
+    [Fact]
+    public void QueryBuilder_OrderBy_WithMaliciousInput_ShouldThrowSecurityException()
+    {
+        var sqlServer = new SQLServerQueryBuilder();
+        var postgres = new PostgreSQLQueryBuilder();
+        var mysql = new MySQLQueryBuilder();
+
+        var act1 = () => sqlServer.OrderBy("Id; DROP TABLE Usuarios--");
+        var act2 = () => postgres.OrderBy("Email; DELETE FROM Logins;--");
+        var act3 = () => mysql.OrderBy("Nome' OR '1'='1");
+
+        act1.Should().Throw<SecurityException>();
+        act2.Should().Throw<SecurityException>();
+        act3.Should().Throw<SecurityException>();
+    }
+
+    [Fact]
+    public void QueryBuilder_WhereLike_WithEscapeWildcards_ShouldEscapeCorrectly()
+    {
+        var builder = new SQLServerQueryBuilder();
+        var sql = builder
+            .Select("Id", "Descricao")
+            .From("Itens")
+            .WhereLike("Descricao", "100%_desconto[extra]", escapeWildcards: true)
+            .BuildQuery();
+
+        sql.Should().Be("SELECT Id, Descricao FROM Itens WHERE Descricao LIKE '%100[%][_]desconto[[]extra]%'");
+    }
+
+    [Fact]
+    public void MongoDBQueryBuilder_GroupBy_ShouldBuildValidJsonPipelineWithoutMongoBson()
+    {
+        var builder = new MongoDBQueryBuilder();
+        builder.GroupBy("Categoria", "Status");
+
+        var pipeline = builder.BuildAggregationPipeline();
+        pipeline.Should().HaveCount(1);
+
+        var json = pipeline[0].RootElement.GetRawText();
+        json.Should().Contain("\"$group\"");
+        json.Should().Contain("\"Categoria\": \"$Categoria\"");
+        json.Should().Contain("\"Status\": \"$Status\"");
     }
 }

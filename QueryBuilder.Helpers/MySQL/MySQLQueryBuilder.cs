@@ -1,5 +1,6 @@
 using QueryBuilder.Helpers.Core;
 using QueryBuilder.Helpers.Enums;
+using QueryBuilder.Helpers.Security;
 using System.Text;
 
 namespace QueryBuilder.Helpers.MySQL;
@@ -55,7 +56,8 @@ public class MySQLQueryBuilder : QueryBuilderBase
     /// <inheritdoc/>
     public override IQueryBuilder OrderBy(string column, bool ascending = true)
     {
-        QueryBuilderInternal.Append(" ORDER BY ").Append(column).Append(ascending ? " ASC" : " DESC");
+        var escaped = SqlIdentifierValidator.ValidateAndEscape(column, SqlDialect.MySql);
+        QueryBuilderInternal.Append(" ORDER BY ").Append(escaped).Append(ascending ? " ASC" : " DESC");
         return this;
     }
 
