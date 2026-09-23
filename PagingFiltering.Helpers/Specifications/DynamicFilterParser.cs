@@ -1,5 +1,7 @@
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Security;
+using PagingFiltering.Helpers.Attributes;
 
 namespace PagingFiltering.Helpers.Specifications;
 
@@ -49,6 +51,11 @@ public static class DynamicFilterParser
         var param = Expression.Parameter(typeof(T), "x");
         var property = typeof(T).GetProperty(criterion.PropertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
             ?? throw new ArgumentException($"Propriedade '{criterion.PropertyName}' não encontrada no tipo '{typeof(T).Name}'.", nameof(criterion));
+
+        if (property.GetCustomAttribute<FilterIgnoreAttribute>() != null)
+        {
+            throw new SecurityException($"A propriedade '{property.Name}' possui restrição de segurança e não pode ser utilizada como filtro.");
+        }
 
         var left = Expression.Property(param, property);
         var targetType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;

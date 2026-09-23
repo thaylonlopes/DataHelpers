@@ -1,10 +1,11 @@
-﻿using FluentAssertions;
-using Moq;
+using FluentAssertions;
+using PagingFiltering.Helpers.Attributes;
+using PagingFiltering.Helpers.Builders;
 using PagingFiltering.Helpers.Extensions;
 using PagingFiltering.Helpers.Implementations;
-using PagingFiltering.Helpers.Interfaces;
 using PagingFiltering.Helpers.Models;
 using PagingFiltering.Helpers.Specifications;
+using System.Security;
 using Xunit;
 
 namespace PagingFiltering.Helpers.Tests;
@@ -12,6 +13,26 @@ namespace PagingFiltering.Helpers.Tests;
 public class PagingFilteringTests
 {
     private record TestItem(string Id, string Nome, int Idade);
+
+    private class Conta
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+
+        [FilterIgnore]
+        public string PasswordHash { get; set; } = string.Empty;
+
+        [FilterIgnore]
+        public bool IsSuperAdmin { get; set; }
+    }
+
+    private class RegistroVenda
+    {
+        public int Id { get; set; }
+        public DateTime CriadoEm { get; set; }
+        public DateTime? DataCancelamento { get; set; }
+        public decimal Valor { get; set; }
+    }
 
     [Fact]
     public void PaginationHelper_ApplyPagination_ShouldReturnCorrectSliceAndMetadata()
@@ -34,8 +55,7 @@ public class PagingFilteringTests
     [Fact]
     public void PaginationFilterHelper_ApplySorting_ShouldSortAscendingAndDescending()
     {
-        var mockCache = new Mock<ICacheService>();
-        var helper = new PaginationFilterHelper<TestItem>(mockCache.Object);
+        var helper = new PaginationFilterHelper<TestItem>();
         var items = new List<TestItem>
         {
             new("3", "Carlos", 30),
@@ -56,31 +76,9 @@ public class PagingFilteringTests
     }
 
     [Fact]
-    public async Task PaginationFilterHelper_ApplyCachingAsync_ShouldUseCacheWhenAvailable()
-    {
-        var mockCache = new Mock<ICacheService>();
-        var cachedItems = (IEnumerable<TestItem>)new List<TestItem> { new("1", "Cache", 99) };
-        mockCache.Setup(c => c.GetAsync<IEnumerable<TestItem>>("my_key"))
-            .ReturnsAsync(cachedItems);
-
-        var helper = new PaginationFilterHelper<TestItem>(mockCache.Object);
-        var dataFetchCalled = false;
-
-        var result = await helper.ApplyCachingAsync("my_key", () =>
-        {
-            dataFetchCalled = true;
-            return Task.FromResult((IEnumerable<TestItem>)new List<TestItem>());
-        });
-
-        result.Should().BeSameAs(cachedItems);
-        dataFetchCalled.Should().BeFalse();
-    }
-
-    [Fact]
     public void PaginationFilterHelper_ApplyComplexFilters_ShouldCombineAllPredicates()
     {
-        var mockCache = new Mock<ICacheService>();
-        var helper = new PaginationFilterHelper<TestItem>(mockCache.Object);
+        var helper = new PaginationFilterHelper<TestItem>();
         var items = new List<TestItem>
         {
             new("1", "Ana", 20),
@@ -120,7 +118,6 @@ public class PagingFilteringTests
             .ToList();
 
         var firstPage = dataset.ApplyKeyset(x => x.Idade, afterKey: 0, pageSize: 10);
-
         var secondPage = dataset.ApplyKeyset(x => x.Idade, afterKey: 10, pageSize: 10);
 
         firstPage.Items.Should().HaveCount(10);
@@ -156,5 +153,85 @@ public class PagingFilteringTests
         filtered.Should().HaveCount(1);
         filtered[0].Nome.Should().Be("Carlos Silva");
         filtered[0].Idade.Should().Be(35);
+    }
+
+    [Fact]
+    public void ApplyKeyset_WithNullableKey_ShouldThrowInvalidOperationException()
+    {
+        var act = () => new KeysetSeekBuilder<RegistroVenda>()
+            .OrderBy(x => x.DataCancelamento);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*NOT NULL*");
+    }
+
+    [Fact]
+    public void ApplyKeyset_WithMixedCompositeOrdering_ShouldApplyCorrectSeekClause()
+    {
+        var baseDate = new DateTime(2026, 9, 22, 10, 0, 0, DateTimeKind.Utc);
+        var vendas = new List<RegistroVenda>
+        {
+            new() { Id = 101, CriadoEm = baseDate.AddMinutes(30), Valor = 10 },
+            new() { Id = 102, CriadoEm = baseDate.AddMinutes(30), Valor = 20 },
+            new() { Id = 103, CriadoEm = baseDate.AddMinutes(20), Valor = 30 },
+            new() { Id = 104, CriadoEm = baseDate.AddMinutes(10), Valor = 40 }
+        };
+
+        var cursorDate = baseDate.AddMinutes(30);
+        var cursorId = 101;
+
+        var result = vendas.ApplyKeysetComposite(
+            primaryKeySelector: x => x.CriadoEm,
+            primaryAscending: false,
+            secondaryKeySelector: x => x.Id,
+            secondaryAscending: true,
+            afterCursor: (cursorDate, cursorId),
+            pageSize: 2
+        ).ToList();
+
+        result.Should().HaveCount(2);
+        result[0].Id.Should().Be(102);
+        result[1].Id.Should().Be(103);
+
+        var builder = new KeysetSeekBuilder<RegistroVenda>()
+            .OrderBy(x => x.CriadoEm, ascending: false)
+            .ThenBy(x => x.Id, ascending: true);
+
+        var builderResult = builder.ApplySeek(vendas, new object[] { cursorDate, cursorId }, pageSize: 2).ToList();
+        builderResult.Should().HaveCount(2);
+        builderResult[0].Id.Should().Be(102);
+        builderResult[1].Id.Should().Be(103);
+    }
+
+    [Fact]
+    public void DynamicFilterParser_WithFilterIgnoreAttribute_ShouldThrowSecurityException()
+    {
+        var criterionPassword = new FilterCriterion("PasswordHash", FilterOperator.Equals, "secret_hash");
+        var criterionAdmin = new FilterCriterion("IsSuperAdmin", FilterOperator.Equals, true);
+
+        var actPassword = () => DynamicFilterParser.Parse<Conta>(criterionPassword);
+        var actAdmin = () => DynamicFilterParser.Parse<Conta>(criterionAdmin);
+
+        actPassword.Should().Throw<SecurityException>()
+            .WithMessage("*PasswordHash*restrição de segurança*");
+
+        actAdmin.Should().Throw<SecurityException>()
+            .WithMessage("*IsSuperAdmin*restrição de segurança*");
+    }
+
+    [Fact]
+    public void PaginationFilterHelper_ShouldOperatePurelyWithoutCache()
+    {
+        var helper = new PaginationFilterHelper<TestItem>();
+        var items = new List<TestItem>
+        {
+            new("1", "A", 10),
+            new("2", "B", 20),
+            new("3", "C", 30)
+        };
+
+        var paged = helper.ApplyPagination(items, pageNumber: 1, pageSize: 2);
+        paged.Items.Should().HaveCount(2);
+        paged.TotalItems.Should().Be(3);
     }
 }

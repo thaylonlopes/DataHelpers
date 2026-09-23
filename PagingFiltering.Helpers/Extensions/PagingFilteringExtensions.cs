@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Caching.Memory;
+using PagingFiltering.Helpers;
+using PagingFiltering.Helpers.Implementations;
 using PagingFiltering.Helpers.Interfaces;
-using PagingFiltering.Helpers.Services;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -10,7 +10,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class PagingFilteringExtensions
 {
     /// <summary>
-    /// Registra os serviços de paginação, filtragem e cache em memória no contêiner de DI.
+    /// Registra os serviços de paginação e filtragem no contêiner de DI.
     /// </summary>
     /// <param name="services">Coleção de serviços de injeção de dependência.</param>
     /// <returns>A coleção de serviços para encadeamento.</returns>
@@ -18,8 +18,8 @@ public static class PagingFilteringExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddMemoryCache();
-        services.AddSingleton<ICacheService, MemoryCacheService>();
+        services.AddTransient(typeof(IPaginationHelper<>), typeof(PaginationHelper<>));
+        services.AddTransient(typeof(IPaginationFilterHelper<>), typeof(PaginationFilterHelper<>));
 
         return services;
     }

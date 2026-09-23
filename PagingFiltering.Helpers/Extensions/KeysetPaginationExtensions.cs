@@ -30,6 +30,11 @@ public static class KeysetPaginationExtensions
         ArgumentNullException.ThrowIfNull(keySelector);
         if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize), "O tamanho da página deve ser maior que zero.");
 
+        if (Nullable.GetUnderlyingType(typeof(TKey)) != null)
+        {
+            throw new InvalidOperationException("Colunas da chave de busca (Keyset Seek) devem ser obrigatoriamente NOT NULL para garantir determinismo SQL.");
+        }
+
         var ordered = ascending
             ? source.OrderBy(keySelector)
             : source.OrderByDescending(keySelector);
@@ -55,6 +60,65 @@ public static class KeysetPaginationExtensions
         var nextKey = pageItems.Count > 0 ? keySelector(pageItems[^1]) : default;
 
         return new PagedResultKeyset<T, TKey>(pageItems, pageSize, previousKey, nextKey, hasMore);
+    }
+
+    /// <summary>
+    /// Aplica paginação por chave composta mista (ex: Data DESC, Id ASC) em uma coleção em memória.
+    /// </summary>
+    public static IEnumerable<T> ApplyKeysetComposite<T, TKey1, TKey2>(
+        this IEnumerable<T> source,
+        Func<T, TKey1> primaryKeySelector,
+        bool primaryAscending,
+        Func<T, TKey2> secondaryKeySelector,
+        bool secondaryAscending,
+        (TKey1 Key1, TKey2 Key2)? afterCursor,
+        int pageSize)
+        where TKey1 : IComparable<TKey1>
+        where TKey2 : IComparable<TKey2>
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(primaryKeySelector);
+        ArgumentNullException.ThrowIfNull(secondaryKeySelector);
+        if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize), "O tamanho da página deve ser maior que zero.");
+
+        if (Nullable.GetUnderlyingType(typeof(TKey1)) != null || Nullable.GetUnderlyingType(typeof(TKey2)) != null)
+        {
+            throw new InvalidOperationException("Colunas da chave de busca (Keyset Seek) devem ser obrigatoriamente NOT NULL para garantir determinismo SQL.");
+        }
+
+        var ordered = primaryAscending
+            ? source.OrderBy(primaryKeySelector)
+            : source.OrderByDescending(primaryKeySelector);
+
+        var fullyOrdered = secondaryAscending
+            ? ordered.ThenBy(secondaryKeySelector)
+            : ordered.ThenByDescending(secondaryKeySelector);
+
+        var filtered = fullyOrdered.AsEnumerable();
+
+        if (afterCursor != null)
+        {
+            var cursor = afterCursor.Value;
+            filtered = filtered.Where(x =>
+            {
+                var cmp1 = primaryKeySelector(x).CompareTo(cursor.Key1);
+                if (primaryAscending)
+                {
+                    if (cmp1 > 0) return true;
+                    if (cmp1 < 0) return false;
+                }
+                else
+                {
+                    if (cmp1 < 0) return true;
+                    if (cmp1 > 0) return false;
+                }
+
+                var cmp2 = secondaryKeySelector(x).CompareTo(cursor.Key2);
+                return secondaryAscending ? cmp2 > 0 : cmp2 < 0;
+            });
+        }
+
+        return filtered.Take(pageSize);
     }
 }
 

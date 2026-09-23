@@ -1,4 +1,4 @@
-﻿
+
 using PagingFiltering.Helpers.Interfaces;
 using PagingFiltering.Helpers.Models;
 using System.Linq.Expressions;
@@ -7,11 +7,8 @@ namespace PagingFiltering.Helpers
 {
     public class PaginationFilterHelper<T> : IPaginationFilterHelper<T>
     {
-        private readonly ICacheService _cacheService;
-
-        public PaginationFilterHelper(ICacheService cacheService)
+        public PaginationFilterHelper()
         {
-            _cacheService = cacheService;
         }
 
         public IEnumerable<T> ApplyFilter(IEnumerable<T> source, Func<T, bool> filter)
@@ -51,40 +48,6 @@ namespace PagingFiltering.Helpers
             var items = source.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
 
             return Task.FromResult(new PagedResult<T>(items, pageNumber, pageSize, totalItems));
-        }
-
-        public async Task<IEnumerable<T>> ApplyCachingAsync(string cacheKey, Func<Task<IEnumerable<T>>> getDataFunc)
-        {
-            ArgumentNullException.ThrowIfNull(cacheKey);
-            ArgumentNullException.ThrowIfNull(getDataFunc);
-
-            var cachedData = await _cacheService.GetAsync<IEnumerable<T>>(cacheKey);
-            if (cachedData == null)
-            {
-                cachedData = await getDataFunc();
-                await _cacheService.SetCachedDataAsync(cacheKey, cachedData);
-            }
-            return cachedData;
-        }
-
-        public async Task<PagedResult<T>> ApplyPaginationCachedAsync(IEnumerable<T> source, int pageNumber, int pageSize)
-        {
-            ArgumentNullException.ThrowIfNull(source);
-
-            var cacheKey = $"PagedResult_{pageNumber}_{pageSize}";
-            var cachedResult = await _cacheService.GetAsync<PagedResult<T>>(cacheKey);
-
-            if (cachedResult != null)
-            {
-                return cachedResult;
-            }
-
-            var totalItems = source.Count();
-            var items = source.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
-            var pagedResult = new PagedResult<T>(items, pageNumber, pageSize, totalItems);
-
-            await _cacheService.SetAsync(cacheKey, pagedResult, TimeSpan.FromMinutes(10));
-            return pagedResult;
         }
 
         public async Task<IEnumerable<T>> ApplyFilterAsync(IEnumerable<T> source, Expression<Func<T, bool>> filterExpression)
