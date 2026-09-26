@@ -23,14 +23,14 @@ O pacote `TL.PagingFiltering.Helpers` foi desenvolvido para solucionar a latênc
 ### 3. Parser Dinâmico de Filtros (`DynamicFilterParser`)
 - Converte coleções dinâmicas de critérios de requisição HTTP (`FilterCriterion` suportando operadores `Equals`, `GreaterThan`, `LessThan`, `Contains`, `StartsWith`) diretamente em árvores de expressão `Expression<Func<T, bool>>` compiladas e imutáveis.
 
-### 4. Especialização Keyset Seek Composto & Validação NOT NULL (v0.4.0)
+### 4. Keyset Seek Composto e Validação de Chaves Não-Nuláveis
 - Criação de `KeysetSeekBuilder<T>` permitindo encadeamento fluente de chaves primárias e secundárias (`OrderBy` e `ThenBy`) com direções mistas (ex: `Data DESC, Id ASC`).
 - Validação defensiva em tempo de execução: colunas da chave de seek não podem ser anuláveis (`Nullable.GetUnderlyingType != null`), disparando `InvalidOperationException` preventiva para impedir inconsistências e perda de ponteiro em bancos relacionais.
 
-### 5. Expurgo de Infraestrutura de Cache (v0.4.0)
-- Expurgo definitivo da interface `ICacheService`, classe `MemoryCacheService` e do método `ApplyPaginationCachedAsync`, desacoplando totalmente a biblioteca de caching e eliminando riscos de colisão de chaves. A biblioteca reassume responsabilidade única (SRP).
+### 5. Desacoplamento e Responsabilidade Única (Isolamento de Caching)
+- Remoção definitiva da interface `ICacheService`, classe `MemoryCacheService` e do método `ApplyPaginationCachedAsync`, desacoplando totalmente a biblioteca de caching e eliminando riscos de colisão de chaves. A biblioteca reassume responsabilidade única (SRP).
 
-### 6. Proteção contra Exposição de Dados com `[FilterIgnore]` (v0.4.0)
+### 6. Proteção contra Exposição de Dados com `[FilterIgnore]`
 - Criação do atributo declarativo `[FilterIgnore]` para anotação em propriedades de entidades que não devem ser consultadas dinamicamente via requisições HTTP externas.
 - O `DynamicFilterParser` rejeita requisições que tentem filtrar ou projetar campos anotados com `SecurityException`, impedindo vazamento de dados confidenciais (ex: senhas, hashes, dados internos).
 

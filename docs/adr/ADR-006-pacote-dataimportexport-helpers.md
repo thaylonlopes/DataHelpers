@@ -31,15 +31,15 @@ O pacote `TL.DataImportExport.Helpers` foi desenvolvido para unificar a ingestã
 - **JSON:** `System.Text.Json` de alto throughput com zero overhead de conversão intermediária.
 - **XML:** Streaming nativo tipado com segurança defensiva contra XXE (*XML External Entity*).
 
-### 4. Adoção de ILogger Nativo da BCL e Erradicação de Console.WriteLine (v0.4.0)
-- Expurgo de implementações manuais de logging (`SimpleLogger`) e de chamadas diretas a `Console.WriteLine` (Regra #8).
+### 4. Logging Estruturado Desacoplado (Microsoft.Extensions.Logging)
+- Substituição de implementações manuais de logging (`SimpleLogger`) e de saídas diretas de console por abstrações corporativas.
 - Adoção estrita de `Microsoft.Extensions.Logging.ILogger` com default `NullLogger.Instance`, viabilizando integração transparente com Serilog, OpenTelemetry e Application Insights.
 
-### 5. Mitigação de Injeção de Fórmulas em Arquivos CSV (v0.4.0)
+### 5. Proteção contra Injeção de Fórmulas em Arquivos CSV
 - Implementação de `SafeCsvFormulaStringConverter` integrado ao pipeline de escrita do `CsvHelper`.
 - Sanitização preventiva: qualquer célula de texto que inicie com os caracteres perigosos `=`, `+`, `-`, `@`, `\t` ou `\r` é prefixada com apóstrofo seguro (`'`), neutralizando execuções de comandos arbitrários e fórmulas dinâmicas ao abrir relatórios no Excel ou Calc.
 
-### 6. Guardrail de Memória no ClosedXML (v0.4.0)
+### 6. Guardrail de Memória para Planilhas Excel
 - O `ClosedXML` instancia todo o modelo DOM da planilha em memória Heap, gerando risco de esgotamento de memória em planilhas volumosas.
 - Implementação da propriedade `MaxRowsLimit` (padrão 15.000 linhas) no `ExcelDataImporter`. Se o volume ultrapassar o teto, a leitura é abortada imediatamente com `InvalidOperationException` defensiva, instruindo o uso de streaming CSV via `SpanDelimitedParser`.
 

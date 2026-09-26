@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <Version>0.4.0</Version>
+    <Version>0.5.0</Version>
     <Authors>Thaylon Lopes</Authors>
     <Company>TL Engenharia</Company>
     <Product>TL.DataHelpers</Product>
@@ -14,7 +14,7 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
-    <NoWarn>$(NoWarn);1591;NETSDK1206</NoWarn>
+    <NoWarn>$(NoWarn);1591;1572;1573;NETSDK1206</NoWarn>
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>

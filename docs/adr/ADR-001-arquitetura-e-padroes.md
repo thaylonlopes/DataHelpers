@@ -1,4 +1,4 @@
-# ADR 001: Arquitetura Canônica do Ecossistema TL.DataHelpers, Segurança e FinOps
+# ADR 001: Arquitetura Canônica do Ecossistema TL.DataHelpers, Segurança, Padrões e FinOps
 
 ---
 
@@ -118,5 +118,4 @@ Com a evolução para a versão 0.3.0, identificou-se a necessidade de sanear d�
 ## Conformidade e Diretrizes Técnicas
 - **Proteção de Dados e Defesa em Profundidade:** Cifragem de dados em repouso no cache, bloqueio de exposição de campos sensíveis em APIs e sanitização de dados exportados.
 - **Multi-Targeting:** Compilação simultânea e limpa para `.NET 8` e `.NET 9` com política estrita de zero warnings.
-
 

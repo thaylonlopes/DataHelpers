@@ -23,11 +23,11 @@ O pacote `TL.MongoDriver.Helpers` foi concebido para estruturar o acesso a docum
 ### 3. Interceptors de Domínio e Eventos
 - Habilita interceptadores (`CaptureEventsInterceptor`) para capturar eventos de domínio vinculados à entidade e despachá-los assincronamente após o commit transacional.
 
-### 4. Transações ACID Explícitas e Auto-Rollback Defensivo (v0.4.0)
+### 4. Transações ACID Explícitas e Auto-Rollback Defensivo
 - Adição dos métodos `BeginTransactionAsync`, `CommitTransactionAsync` e `RollbackTransactionAsync` no `IMongoContext` e `MongoContext`.
 - Mecanismo transacional de segurança no `SaveChanges()`: se qualquer comando da lista de mutações falhar, o `MongoContext` invoca automaticamente `AbortTransactionAsync` na sessão ativa antes de relançar a exceção, garantindo integridade estrita e prevenindo commits parciais órfãos.
 
-### 5. Registro Idempotente e Thread-Safe de BSON no Container de DI (v0.4.0)
+### 5. Registro Idempotente e Thread-Safe de BSON no Container de DI
 - Criação do utilitário `BsonRegistrationHelper`:
   - Isolamento de concorrência com `lock` e rastreamento estático em `HashSet` para convenções (`RegisterConvention`) e serializadores (`RegisterSerializer`).
   - Tratamento resiliente de corridas na inicialização concorrente de hosts de microsserviços ou suítes de testes paralelas, evitando exceções `BsonSerializationException` ("There is already a serializer registered for type...").
