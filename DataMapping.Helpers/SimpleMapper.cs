@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
 using DataMapping.Helpers.Common;
@@ -224,7 +225,8 @@ public class SimpleMapper : IMapper
     /// <param name="source">O objeto de origem a ser mapeado.</param>
     /// <returns>A instância mapeada de destino.</returns>
     /// <exception cref="ArgumentNullException">Lançada quando a instância de origem for nula.</exception>
-    public TDestination Map<TSource, TDestination>(TSource source)
+    [RequiresUnreferencedCode("O mapeamento dinâmico utiliza reflexão para inspecionar propriedades.")]
+    public TDestination Map<TSource, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicConstructors)] TDestination>(TSource source)
     {
         ArgumentNullException.ThrowIfNull(source);
 
@@ -241,7 +243,8 @@ public class SimpleMapper : IMapper
     /// <typeparam name="TDestination">O tipo do item de destino.</typeparam>
     /// <param name="source">A coleção de origem.</param>
     /// <returns>Uma lista contendo os itens mapeados.</returns>
-    public IEnumerable<TDestination> MapCollection<TSource, TDestination>(IEnumerable<TSource> source)
+    [RequiresUnreferencedCode("O mapeamento dinâmico utiliza reflexão para inspecionar propriedades.")]
+    public IEnumerable<TDestination> MapCollection<TSource, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicConstructors)] TDestination>(IEnumerable<TSource> source)
     {
         if (source == null)
         {
@@ -266,7 +269,8 @@ public class SimpleMapper : IMapper
     /// <typeparam name="TDestination">O tipo do objeto de destino.</typeparam>
     /// <param name="source">O objeto de origem.</param>
     /// <returns>O resultado contendo a instância mapeada ou a falha.</returns>
-    public Result<TDestination> TryMap<TSource, TDestination>(TSource? source)
+    [RequiresUnreferencedCode("O mapeamento dinâmico utiliza reflexão para inspecionar propriedades.")]
+    public Result<TDestination> TryMap<TSource, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicConstructors)] TDestination>(TSource? source)
     {
         if (source is null)
         {
@@ -284,7 +288,8 @@ public class SimpleMapper : IMapper
         }
     }
 
-    private static Func<TSource, TDestination> CreateMapDelegate<TSource, TDestination>()
+    [RequiresUnreferencedCode("O mapeamento dinâmico utiliza reflexão para inspecionar propriedades.")]
+    private static Func<TSource, TDestination> CreateMapDelegate<TSource, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicConstructors)] TDestination>()
     {
         var sourceType = typeof(TSource);
         var destType = typeof(TDestination);
@@ -381,14 +386,16 @@ public class SimpleMapper : IMapper
         return false;
     }
 
-    private static List<TDestItem>? MapListInternal<TSourceItem, TDestItem>(IEnumerable<TSourceItem>? sourceList)
+    [RequiresUnreferencedCode("O mapeamento dinâmico utiliza reflexão para inspecionar propriedades.")]
+    private static List<TDestItem>? MapListInternal<TSourceItem, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicConstructors)] TDestItem>(IEnumerable<TSourceItem>? sourceList)
     {
         if (sourceList == null) return null;
         var mapper = new SimpleMapper();
         return sourceList.Select(item => mapper.Map<TSourceItem, TDestItem>(item)).ToList();
     }
 
-    private static TDest? MapNestedInternal<TSource, TDest>(TSource? source) where TSource : class where TDest : class, new()
+    [RequiresUnreferencedCode("O mapeamento dinâmico utiliza reflexão para inspecionar propriedades.")]
+    private static TDest? MapNestedInternal<TSource, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicConstructors)] TDest>(TSource? source) where TSource : class where TDest : class, new()
     {
         if (source == null) return null;
         var mapper = new SimpleMapper();
