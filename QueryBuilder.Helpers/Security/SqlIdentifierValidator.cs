@@ -8,9 +8,24 @@ namespace QueryBuilder.Helpers.Security;
 /// </summary>
 public enum SqlDialect
 {
+    /// <summary>
+    /// Microsoft SQL Server (delimitação por colchetes [coluna]).
+    /// </summary>
     SqlServer,
+
+    /// <summary>
+    /// PostgreSQL (delimitação por aspas duplas "coluna").
+    /// </summary>
     PostgreSql,
+
+    /// <summary>
+    /// MySQL / MariaDB (delimitação por crases `coluna`).
+    /// </summary>
     MySql,
+
+    /// <summary>
+    /// Oracle Database (delimitação por aspas duplas "COLUNA").
+    /// </summary>
     Oracle
 }
 
@@ -55,6 +70,9 @@ public static class SqlIdentifierValidator
     /// <summary>
     /// Valida e aplica a delimitação correta do dialeto especificado.
     /// </summary>
+    /// <param name="identifier">O identificador a ser validado e delimitado.</param>
+    /// <param name="dialect">O dialeto SQL alvo.</param>
+    /// <returns>O identificador devidamente sanitizado e delimitado.</returns>
     public static string ValidateAndEscape(string identifier, SqlDialect dialect)
     {
         if (string.IsNullOrWhiteSpace(identifier))
@@ -95,6 +113,8 @@ public static class SqlIdentifierValidator
     /// <summary>
     /// Escapa caracteres coringa (%, _ e [) para prevenir ataques de Wildcard DoS / LIKE Injection (CWE-400).
     /// </summary>
+    /// <param name="input">O texto a ser sanitizado para predicado LIKE.</param>
+    /// <returns>O texto com caracteres coringa neutralizados.</returns>
     public static string EscapeLikeWildcards(string input)
     {
         if (string.IsNullOrEmpty(input)) return string.Empty;

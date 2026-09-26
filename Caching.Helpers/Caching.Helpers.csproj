@@ -5,7 +5,7 @@
     <PackageId>TL.Caching.Helpers</PackageId>
     <Title>Caching.Helpers</Title>
     <Description>Biblioteca utilitária avançada para caching distribuído e em memória com suporte a arquitetura multinível L1/L2, resiliência e locking distribuído.</Description>
-    <NoWarn>$(NoWarn);1591;NETSDK1206</NoWarn>
+    <NoWarn>$(NoWarn);NETSDK1206</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

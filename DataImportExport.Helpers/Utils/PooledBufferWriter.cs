@@ -3,12 +3,19 @@ using System.Buffers;
 namespace DataImportExport.Helpers.Utils;
 
 /// <summary>
-/// Utilitario de escrita de alta performance que utiliza ArrayPool para descarregar linhas delimitadas com zero alocacao persistente no Heap.
+/// Utilitário de escrita de alta performance que utiliza ArrayPool para descarregar linhas delimitadas com zero alocação persistente no Heap.
 /// </summary>
 public static class PooledBufferWriter
 {
     private const int DefaultBufferSize = 4096;
 
+    /// <summary>
+    /// Escreve uma linha com campos delimitados de forma assíncrona em um <see cref="TextWriter"/> utilizando buffer reciclado via <see cref="ArrayPool{T}"/>.
+    /// </summary>
+    /// <param name="writer">O fluxo de escrita de texto de destino.</param>
+    /// <param name="fields">A coleção de campos textuais a serem gravados.</param>
+    /// <param name="delimiter">O caractere delimitador entre as colunas (padrão vírgula ',').</param>
+    /// <returns>Uma tarefa assíncrona representando a conclusão da escrita.</returns>
     public static async Task WriteDelimitedRowAsync(TextWriter writer, IEnumerable<string?> fields, char delimiter = ',')
     {
         ArgumentNullException.ThrowIfNull(writer);
